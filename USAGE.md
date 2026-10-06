@@ -4,3 +4,6 @@ One row per agent session. In Gemini CLI, type `/stats` before you quit and copy
 
 | Date | Tool | Input tokens | Output tokens | Credits (if no tokens) | List-price cost |
 |---|---|---|---|---|---|
+| 2026-10-06 | ChatGPT | N/A | N/A | N/A | |
+
+Note: ChatGPT was used for this session. Exact per-session token statistics were not available in the ChatGPT interface, so no token count or cost was estimated.
