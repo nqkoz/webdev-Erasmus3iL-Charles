@@ -6,9 +6,10 @@
   "directories": {
     "doc": "docs"
   },
-  "scripts": {
-    "mcp": "node mcp-server/server.js"
-  },
+"scripts": {
+  "test": "node mcp-server/check.mjs -- node mcp-server/server.js",
+  "mcp": "node mcp-server/server.js"
+},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nqkoz/webdev-Erasmus3iL-Charles.git"
