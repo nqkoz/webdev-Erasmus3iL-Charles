@@ -68,15 +68,7 @@ Server → client: {"jsonrpc":"2.0","id":6,"error":{"code":-32601,"message":"Unk
 
 ## The description experiment
 
-Not yet evidenced in this repository. No real-agent experiment was performed during the local repair session; Gemini CLI is not installed in this Windows environment.
-
-Complete in the course Codespace:
-
-1. Start Gemini CLI, run /mcp and verify that my-project exposes both tools.
-2. Ask "What does lecture 5 cover?" without naming a tool, and record the tool chosen and result.
-3. Record /stats, quit, and change only the find_lecture description.
-4. Start a fresh session, repeat the same question, and record /stats again.
-5. Replace this pending note with three sentences: the exact description change, whether tool choice changed, and your explanation based on the observation. Log both sessions in AGENT_LOG.md and USAGE.md. Retain a meaningful final description of at least 20 characters.
+With the original `find_lecture` description, the student asked Copilot “What does lecture 5 cover?” and reported a visible `find_lecture` call; the answer was “What the agent built, part 1 covers HTTP, REST vs. GraphQL, data modeling, ORMs, and application layers.” After changing only the description to `Return course lecture information` and confirming that `my-project` had restarted, the student asked the same question in a fresh chat, reported that `find_lecture` was still called, and received “Lecture 5 covers HTTP, REST vs. GraphQL, data modeling, ORMs, and application layers.” Tool choice did not change in these two observed trials; the wording of the answers differed, and per-session usage statistics were unavailable.
 
 ## Where this goes next
 

@@ -23,7 +23,7 @@ Exercise 1 currently implements a local lecture/student MCP server. The next pro
 
 ## Current implementation status
 - Exercise 1 protocol code must remain student-authored under the course instructions: explain and review it, and have the student implement any required handler fixes.
-- Manual transcript and real-agent description experiment still require student evidence; never invent results or usage counts.
+- The course's hand-entered terminal transcript still needs student evidence. The real-agent description comparison was performed in two student-reported VS Code UI trials with the server reload confirmed; never invent results or usage counts.
 - The HTTP layers, model feature, user sessions and coverage gates below are requirements for the future project, not claims about the current MCP server.
 
 ## Layers

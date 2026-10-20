@@ -7,6 +7,11 @@ One row per agent session. In Gemini CLI, type `/stats` before you quit and copy
 | 2026-10-06 | ChatGPT | N/A | N/A | N/A | |
 | 2026-10-20 | ChatGPT / Codex | N/A | N/A | N/A | |
 | 2026-10-20 | Copilot SDK in VS Code | N/A | N/A | N/A | |
+| 2026-10-20 | Copilot SDK in VS Code | N/A | N/A | N/A | |
+| 2026-10-20 | Independent Copilot session | N/A | N/A | N/A | |
+| 2026-10-20 | Copilot Chat in VS Code (preliminary, reload unconfirmed) | N/A | N/A | N/A | |
+| 2026-10-20 | Copilot Chat in VS Code (controlled baseline) | N/A | N/A | N/A | |
+| 2026-10-20 | Copilot Chat in VS Code (controlled description trial 2) | N/A | N/A | N/A | |
 
 Exact per-session token counts and list-price costs were not available for these ChatGPT/Copilot sessions. N/A does not mean zero; no statistics were invented. Confirm acceptance of this reporting format with the instructor; use `/stats` for future Gemini CLI sessions.
 

@@ -44,3 +44,17 @@ One entry per agent session, newest at the bottom. Be honest: what went wrong is
 - Went wrong: the VS Code setup did not explain how to confirm the tools in Copilot Agent mode, and the unused token placeholder could suggest a key was required.
 - Changed by hand: documented the VS Code Copilot connection and manual verification steps in `mcp-server/README.md`; simplified `.vscode/mcp.json`.
 - Remaining: the student still needs to confirm tool visibility and selection in the local VS Code Copilot UI; this session did not verify that UI.
+
+## 2026-10-20 · Verify Exercise 1 evidence and MCP availability
+
+- Goal: rerun the Exercise 1 checks, capture actual server exchanges, verify both tools, and determine whether the description experiment can be performed in independent agent sessions.
+- Delegated: started one independent Copilot session with the question "What does lecture 5 cover?" and no file edits.
+- Checkpoints: direct self-check passed 12/12; Windows npm launch check passed 12/12; replayed every message from `messages.jsonl` against the actual server and captured the replies; called `find_lecture(5)` and `get_student_info` through MCP in this session; both calls returned the local data.
+- Went wrong: the independent session did not use MCP and instead searched and read `mcp-server/lectures.json`. It is not valid evidence of an agent selecting the tool. The independent session's tool trace had no MCP invocation.
+- Changed by hand: no code or data changed. This log records only actions and results actually observed.
+- UI evidence reported by the student: in a fresh VS Code Copilot Agent conversation, the exact question "What does lecture 5 cover?" showed a visible `find_lecture` call. This is a user-reported UI observation, separate from the direct MCP tool invocations above.
+- Preliminary UI attempt: before the controlled comparison, the student reported no visible tool call in one chat and was unsure whether `my-project` had reloaded. This attempt is excluded from the comparison because the reload was not confirmed.
+- Controlled description comparison, user-reported UI observations: with the original description, a fresh Copilot Agent chat showed a visible `find_lecture` call and returned "What the agent built, part 1 covers HTTP, REST vs. GraphQL, data modeling, ORMs, and application layers." The student changed only the description to `Return course lecture information`, confirmed restarting `my-project` and seeing both tools, then asked the same question in a fresh chat; `find_lecture` was again visible and the answer was "Lecture 5 covers HTTP, REST vs. GraphQL, data modeling, ORMs, and application layers."
+- Conclusion from the controlled observations: tool choice did not change between the two trials; both selected `find_lecture`, while the answer wording differed. This is based on the student's reports of the VS Code UI, not an independently captured UI trace.
+- Cleanup and checks: restored the original description in the local `server.js`; the local server advertises the original description. The direct and Windows npm self-checks passed 12/12 after restoration.
+- Remaining: the course's hand-entered terminal transcript is still outstanding. The automated replay was captured separately and is not presented as the student's manual transcript. Do not claim the lab is complete while this evidence requirement is outstanding.
