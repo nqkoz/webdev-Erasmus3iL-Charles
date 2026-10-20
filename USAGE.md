@@ -5,5 +5,9 @@ One row per agent session. In Gemini CLI, type `/stats` before you quit and copy
 | Date | Tool | Input tokens | Output tokens | Credits (if no tokens) | List-price cost |
 |---|---|---|---|---|---|
 | 2026-10-06 | ChatGPT | N/A | N/A | N/A | |
+| 2026-10-20 | ChatGPT / Codex | N/A | N/A | N/A | |
+| 2026-10-20 | Copilot SDK in VS Code | N/A | N/A | N/A | |
 
-Note: ChatGPT was used for this session. Exact per-session token statistics were not available in the ChatGPT interface, so no token count or cost was estimated.
+Exact per-session token counts and list-price costs were not available for these ChatGPT/Copilot sessions. N/A does not mean zero; no statistics were invented. Confirm acceptance of this reporting format with the instructor; use `/stats` for future Gemini CLI sessions.
+
+Note: ChatGPT was used on 2026-10-06. Exact per-session token statistics were not available in the interface, so no token count or cost was estimated.

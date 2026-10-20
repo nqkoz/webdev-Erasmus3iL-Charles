@@ -4,11 +4,11 @@ Read this file at the start of every session. Keep it short and correct; update 
 
 ## Project
 <!-- One or two sentences: what the app does and for whom. Link SPEC.md. -->
-See `SPEC.md` for goals, non-goals and acceptance criteria.
+Exercise 1 currently implements a local lecture/student MCP server. The next project is Club events, selected by the student; its specification and web application are not implemented yet. See `SPEC.md` for the project template to complete.
 ## Commands
-- Install: `npm install`
+- Install: `npm install` (Node built-ins only for Exercise 1; no dependencies are currently required). Windows PowerShell: `npm.cmd install`.
 - Run: `npm run --silent mcp`
-- Test: `npm test`
+- Test: `npm test` (Windows PowerShell: `npm.cmd test`).
 - Coverage: Not applicable for Exercise 1.
 - MCP server: `npm run --silent mcp`
 
@@ -20,6 +20,11 @@ See `SPEC.md` for goals, non-goals and acceptance criteria.
 - Debug logs and diagnostics go to stderr.
 - Tool failures use `isError: true`; protocol errors use JSON-RPC error codes.
 - Local data is stored in JSON files and loaded by the server.
+
+## Current implementation status
+- Exercise 1 protocol code must remain student-authored under the course instructions: explain and review it, and have the student implement any required handler fixes.
+- Manual transcript and real-agent description experiment still require student evidence; never invent results or usage counts.
+- The HTTP layers, model feature, user sessions and coverage gates below are requirements for the future project, not claims about the current MCP server.
 
 ## Layers
 <!-- Fill in the file or folder for each layer. -->
