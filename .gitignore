@@ -11,6 +11,8 @@ __pycache__/
 
 # local databases and build output
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 dist/

@@ -1,61 +1,94 @@
-# <Project name>
+# Lab Booking · 3iL
 
 <!-- Exercise 2. Write the non-goals first. Every acceptance criterion must be checkable in under a minute.
      Keep these headings exactly as they are: the self-checks look for them by name.
      The full target is on the course site under Resources → The course project. -->
 
 ## Project option
-<!-- One line: lab booking, study groups, club events, or the own project the lecturer approved. -->
+Lab booking.
 
 ## Goals
+- Students can find free workstations for a chosen date, book an available one-hour slot and cancel their own future booking.
+- Lab staff can manage labs and workstations and inspect all bookings; students can see only their own bookings.
 
 ## Non-goals
+- No payments, deposits or paid reservations; all bookings are free.
+- No email, push or SMS notifications; users check the application.
+- No native mobile application; the responsive web application is the only client.
+- No recurring bookings, group bookings or reservations longer than one hour.
 
 ## Constraints
+- Node.js 22, Express, SQLite, numbered SQL migrations, and plain HTML, CSS and JavaScript; all application rules are enforced by the service layer.
+- Passwords are stored only as salted scrypt hashes; session identifiers are random, stored hashed in SQLite, and sent only in HttpOnly cookies.
+- Booking times use the Europe/Sofia time zone. Slots are one hour, Monday to Friday from 08:00 through 18:00; students may book up to 30 days ahead and hold at most three future active bookings.
+- A workstation cannot have overlapping active bookings. Students can cancel only their own bookings, and only before a booking starts; staff permissions are checked in services.
 
 ## The model feature
-<!-- Which model, which modality, and what it does for a user.
-     Name three things or the check fails: the input it receives, the output it produces,
-     and what happens when the model is slow, rate-limited or wrong. -->
-- Model:
-- Input:
-- Output:
-- When it fails:
+- Model: Gemini 2.5 Flash (text), called only from `src/services/slotSuggestionService.js`; chosen because it can interpret structured workstation preferences and suggest from a supplied set of available slots.
+- Input: the requested date, structured non-personal preferences, and the current free-slot identifiers with non-personal lab/workstation descriptions; no name, e-mail, account identifier, booking history or free-text prompt leaves the app.
+- Output: a clearly labelled suggestion containing one offered slot identifier and a short reason; the service verifies that the identifier is still in the supplied free-slot list and never creates a booking.
+- When it fails: an 8-second timeout, missing key, provider error or rate limit returns an explanatory message and the normal free-slot list remains usable; a deterministic rule chooses the first matching free slot, or says no match was found. Invalid model output is discarded.
 
 ## Auth
-<!-- Local sign-in plus at least one provider. Say how an account signing in both ways stays one account. -->
-- Local:
-- Provider:
-- Linking:
+- Local: students sign in with e-mail and password; passwords are salted scrypt hashes and successful sign-in creates the application's ordinary session.
+- Provider: Google OAuth 2.0 authorization-code flow, handled on the server, creates the same kind of application session.
+- Linking: normalize e-mail addresses and link sign-in methods to one account only when Google reports `email_verified: true`; an unverified address is never linked to an existing account. Both sign-in methods resolve to the same user id and permissions.
 
 ## MCP tools
-<!-- At least three tools your own MCP server exposes over this project's data.
-     Each tool calls the same service functions the HTTP API calls, so the same rules apply.
-     A description shorter than 20 characters is not a description. -->
 | Tool | What it does | Who may call it |
 | --- | --- | --- |
-|  |  |  |
+| `list_free_slots` | Lists available workstations and one-hour slots for a requested date, excluding overlapping active bookings. | Signed-in student or lab staff |
+| `my_bookings` | Lists the current user's future and past bookings without exposing another student's records. | Signed-in student |
+| `book_slot` | Books one currently free workstation slot and returns a conflict if it has become unavailable. | Signed-in student |
+| `cancel_booking` | Cancels the current user's own future booking and refuses bookings owned by someone else. | Signed-in student |
+| `suggest_slot` | Suggests one validated free slot from the current availability and never books it automatically. | Signed-in student |
 
 ## UI
-<!-- Stack, and the three or more screens. The graded checklist lives in docs/UI.md. -->
+Node.js 22 and Express provide JSON REST endpoints; plain HTML, CSS and JavaScript call them. Screens: sign-in, my bookings, workstation availability and booking, and the lab-staff dashboard. Every screen handles loading, empty, readable error and success states; the main flow is keyboard accessible, responsive at 380/768/1280 px, uses visible focus and design tokens, and meets 4.5:1 text contrast.
 
 ## Architecture
-<!-- Exercise 3. One request traced through every layer, naming the file for each one,
-     plus one place where your own code does not match this layering. -->
+Implemented student request path: `public/my-bookings.js` and `public/availability.js` → `src/routes/authRoutes.js` and `src/routes/bookingRoutes.js` → `src/services/authService.js` and `src/services/bookingService.js` → repositories in `src/data/` → SQLite migrations in `migrations/`. The project MCP tools are not implemented yet; when added, each must call these same service functions. The existing Exercise 1 `mcp-server/server.js` still reads its course JSON files directly and is not the Lab Booking data path.
 
 ## Acceptance criteria
-<!-- Every criterion carries an id. A test proves it by naming that id in its title, for example
-     test('AC-3 a booking that overlaps another is refused with 409', ...).
-     Say who acts, what they see, and what must be true in the database. -->
-- [AC-1] <example> A member who signs up for an event with no free places sees "This event is full", and no new row appears in `registrations`.
+- [AC-1] A student who signs in with a local e-mail and password sees their account's bookings; the database stores only a salted password hash.
+- [AC-2] A student who asks for workstation availability on a valid date sees each free lab, workstation and one-hour slot; a slot with an overlapping active booking is absent.
+- [AC-3] A student who books a free slot sees a confirmation and a new active row appears in `bookings` for that student and workstation.
+- [AC-4] A student who tries to book a slot that overlaps an active booking sees “This slot is no longer available”, receives HTTP 409, and no second active overlapping row is stored.
+- [AC-5] A student who already has three future active bookings sees “You have reached the booking limit” when trying to book a fourth, and no new active row is stored.
+- [AC-6] A student who cancels their own booking before it starts sees a cancellation confirmation; its `bookings.status` becomes `cancelled` and the slot becomes available.
+- [AC-7] A student who tries to cancel another student's booking receives HTTP 403 and that booking remains active and unchanged.
+- [AC-8] A lab staff member who creates a lab and workstation sees them in the staff dashboard and corresponding rows exist in the database; a student receives HTTP 403 and creates no rows when attempting the same action.
+- [AC-9] A lab staff member sees bookings from all students, while a student sees only bookings belonging to their own user id.
+- [AC-10] A student who requests a model suggestion sees one clearly labelled suggested slot and reason; the slot identifier is in the current free-slot result and no booking is created until the student books it.
+- [AC-11] When the model key is missing, the model times out, is rate-limited or returns an invalid slot, the student sees an explanatory fallback and can still use the ordinary availability list; no invalid suggestion is shown or saved.
+- [AC-12] A signed-in student who uses an MCP booking tool receives the same booking result or service error as the matching HTTP operation, and the MCP session cannot perform lab-staff actions.
+- [AC-13] A signed-in student whose local e-mail is verified by Google signs in by either method to the same user id and sees the same bookings; an unverified Google e-mail does not link to an existing account.
 
-### Slice 1: sign-in and <list screen>
+### Slice 1: sign-in and my bookings
+- [AC-14] A visitor who opens `/my-bookings` without a session is redirected to `/login`, and `GET /api/my-bookings` without a session returns HTTP 401 without booking data.
+- [AC-15] A student who signs in with the seeded local account sees the seeded booking rows for their own account, with lab, workstation, date, time and status; another student's seeded rows are absent.
+- [AC-16] After a booking row is deleted from the local SQLite database, reloading `/my-bookings` removes that row from the displayed list and the seed process does not recreate it.
+- [AC-17] A visitor who submits an incorrect password sees a readable sign-in error, receives no authenticated session, and remains unable to access `/my-bookings`.
 
 ## Traceability
-<!-- Filled in from Exercise 3 onward: each AC id, and the test that names it. -->
+<!-- Add a test reference as each acceptance criterion is implemented. -->
 | Criterion | Test |
 | --- | --- |
-| AC-1 |  |
+| AC-1 | `AC-1 a valid local sign-in creates an opaque HttpOnly session cookie`; salted-hash verification test |
+| AC-2 | `AC-2 availability lists future workstation slots and excludes active overlaps` |
+| AC-3 | `AC-3 booking a free slot returns confirmation and stores an active row` |
+| AC-4 | `AC-4 a booking conflict returns HTTP 409 and stores no overlapping row`; `AC-4 SQLite rejects overlapping active bookings for a workstation` |
+| AC-5 | `AC-5 a fourth future active booking is refused without inserting a row` |
+| AC-6 | `AC-6 cancelling an owned future booking marks it cancelled and frees its slot` |
+| AC-7 | `AC-7 cancelling another student’s booking returns HTTP 403 and leaves it active` |
+| AC-14 | `AC-14 an unauthenticated visitor is redirected from the page and receives no API data` |
+| AC-15 | `AC-15 the seeded student sees their booking details and no other student rows` |
+| AC-16 | `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` |
+| AC-17 | `AC-17 an incorrect password gives a readable error and no authenticated session` |
 
 ## Spec vs result
-<!-- After the agent builds the slice: which criteria passed, which it missed or reinterpreted, and what you changed in this spec because of it. -->
+Database checkpoint: migration `001_initial_schema.sql` created the six initial tables, and the student confirmed the local database contains two seeded labs and three workstations. Migration `002_seed_state.sql` adds the marker that prevents deleted demo bookings from being recreated. Automated tests verify the schema, seed rows, overlap trigger, sign-in/session behavior, per-user booking list, availability, booking limits, conflicts and cancellation/ownership rules.
+
+Exercise 2's requested sign-in-and-list slice is implemented and checked. AC-14's unauthenticated checks returned HTTP 401 for `/api/my-bookings` and HTTP 302 to `/login` for `/my-bookings`; AC-15's booking details and AC-16's deletion result were confirmed by the student in the browser. The bookings screen showed demo booking ID 2 (PC-02, Lab 1250) absent after deletion and reload. The availability form and slots were also visually checked by the student. The student chose not to create a persistent booking in their local database, so booking confirmation in that UI was not manually checked; API behavior for AC-2 through AC-7 is covered by automated tests.
+
+Changed after checking: AC-16 now also says the startup seed must not recreate a deleted booking. The first implementation could have reseeded deleted rows; the migration 002 seed marker and test `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` enforce the observed behavior. The availability, booking and cancellation features (AC-2 through AC-7) are additional scope beyond Exercise 2's required first slice. Google OAuth, the model feature, staff management/dashboard and project MCP tools are specified for the wider project but not built in this exercise.

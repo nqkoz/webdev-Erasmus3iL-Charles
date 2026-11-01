@@ -4,12 +4,12 @@ Read this file at the start of every session. Keep it short and correct; update 
 
 ## Project
 <!-- One or two sentences: what the app does and for whom. Link SPEC.md. -->
-Exercise 1 currently implements a local lecture/student MCP server. The next project is Club events, selected by the student; its specification and web application are not implemented yet. See `SPEC.md` for the project template to complete.
+This repository contains the Exercise 1 lecture/student MCP server and the Lab Booking project for university students and lab staff. See `SPEC.md` for the project's scope, acceptance criteria and planned architecture.
 ## Commands
-- Install: `npm install` (Node built-ins only for Exercise 1; no dependencies are currently required). Windows PowerShell: `npm.cmd install`.
-- Run: `npm run --silent mcp`
+- Install: `npm install` (Windows PowerShell: `npm.cmd install`).
+- Run: `npm start` (serves http://localhost:3000; applies pending SQLite migrations at startup).
 - Test: `npm test` (Windows PowerShell: `npm.cmd test`).
-- Coverage: Not applicable for Exercise 1.
+- Coverage: `npm run coverage` (80% overall; 100% of service-layer branches).
 - MCP server: `npm run --silent mcp`
 
 ## Conventions
@@ -19,12 +19,15 @@ Exercise 1 currently implements a local lecture/student MCP server. The next pro
 - stdout is reserved for JSON-RPC responses.
 - Debug logs and diagnostics go to stderr.
 - Tool failures use `isError: true`; protocol errors use JSON-RPC error codes.
-- Local data is stored in JSON files and loaded by the server.
+- Exercise 1 local data is stored in JSON files. Lab Booking data uses SQLite and numbered SQL migrations.
+- Project routes live in `src/routes/`, business rules in `src/services/`, and SQL access in `src/data/`; only the data layer writes SQL.
+- Front-end files live in `public/`; tests name the acceptance-criterion ID they prove.
 
 ## Current implementation status
 - Exercise 1 protocol code must remain student-authored under the course instructions: explain and review it, and have the student implement any required handler fixes.
 - The course's hand-entered terminal transcript still needs student evidence. The real-agent description comparison was performed in two student-reported VS Code UI trials with the server reload confirmed; never invent results or usage counts.
-- The HTTP layers, model feature, user sessions and coverage gates below are requirements for the future project, not claims about the current MCP server.
+- Lab Booking is in progress: the SQLite schema, local sign-in/session flow, protected bookings list, availability, booking, and cancellation flows are implemented and covered by tests. The student confirmed the bookings and availability screens and the delete/reload behavior; unauthenticated page/API behavior was also checked against the running server. The student declined to create a persistent UI test booking. Google OAuth, the model feature, staff dashboard, and project MCP tools are specified wider-project work, not part of Exercise 2's first slice.
+- The project layering and model/session/coverage rules below are requirements for Lab Booking, not claims about the Exercise 1 MCP server.
 
 ## Layers
 <!-- Fill in the file or folder for each layer. -->

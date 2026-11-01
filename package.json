@@ -6,10 +6,12 @@
   "directories": {
     "doc": "docs"
   },
-"scripts": {
-  "test": "node mcp-server/check.mjs -- node mcp-server/server.js",
-  "mcp": "node mcp-server/server.js"
-},
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "test": "node --test && node mcp-server/check.mjs -- node mcp-server/server.js",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-include='src/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80",
+    "mcp": "node mcp-server/server.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nqkoz/webdev-Erasmus3iL-Charles.git"
@@ -20,5 +22,9 @@
   "bugs": {
     "url": "https://github.com/nqkoz/webdev-Erasmus3iL-Charles/issues"
   },
-  "homepage": "https://github.com/nqkoz/webdev-Erasmus3iL-Charles#readme"
+  "homepage": "https://github.com/nqkoz/webdev-Erasmus3iL-Charles#readme",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.3.0"
+  }
 }
