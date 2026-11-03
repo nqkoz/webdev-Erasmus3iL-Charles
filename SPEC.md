@@ -47,7 +47,7 @@ Lab booking.
 Node.js 22 and Express provide JSON REST endpoints; plain HTML, CSS and JavaScript call them. Screens: sign-in, my bookings, workstation availability and booking, and the lab-staff dashboard. Every screen handles loading, empty, readable error and success states; the main flow is keyboard accessible, responsive at 380/768/1280 px, uses visible focus and design tokens, and meets 4.5:1 text contrast.
 
 ## Architecture
-Implemented student and staff request path: `public/my-bookings.js`, `public/availability.js` and `public/staff.js` → `src/routes/authRoutes.js` and `src/routes/bookingRoutes.js` → `src/services/authService.js` and `src/services/bookingService.js` → repositories in `src/data/` → SQLite migrations in `migrations/`. Google sign-in uses `src/services/googleOAuthClient.js` and links verified provider identities through `src/data/oauthAccountRepository.js`; OAuth tests use fake clients and do not call Google. The project MCP tools are not implemented yet; when added, each must call these same service functions. The existing Exercise 1 `mcp-server/server.js` still reads its course JSON files directly and is not the Lab Booking data path.
+Implemented student and staff request path: `public/my-bookings.js`, `public/availability.js` and `public/staff.js` → `src/routes/authRoutes.js` and `src/routes/bookingRoutes.js` → `src/services/authService.js`, `src/services/bookingService.js` and `src/services/slotSuggestionService.js` → repositories in `src/data/` → SQLite migrations in `migrations/`. Google sign-in uses `src/services/googleOAuthClient.js` and links verified provider identities through `src/data/oauthAccountRepository.js`; OAuth tests use fake clients and do not call Google. Suggestions use `src/services/geminiClient.js`; tests inject fake clients and do not call Gemini. The project MCP tools are not implemented yet; when added, each must call these same service functions. The existing Exercise 1 `mcp-server/server.js` still reads its course JSON files directly and is not the Lab Booking data path.
 
 ## Acceptance criteria
 - [AC-1] A student who signs in with a local e-mail and password sees their account's bookings; the database stores only a salted password hash.
@@ -91,21 +91,24 @@ Implemented student and staff request path: `public/my-bookings.js`, `public/ava
 | AC-7 | `AC-7 cancelling another student’s booking returns HTTP 403 and leaves it active` |
 | AC-8 | `AC-8 only staff can create a lab and workstation and see the new rows` |
 | AC-9 | `AC-9 staff see all student bookings while students see only their own` |
+| AC-10 | `AC-10 and AC-18 a student receives one available model suggestion without creating a booking` |
+| AC-11 | `AC-11 and AC-20 model failure and invalid output fall back to the first matching available slot` |
+| AC-12 | |
 | AC-13 | `AC-13 verified Google sign-in links to the local user and creates the same session identity`; `AC-13 an unverified Google e-mail is not linked to an existing local account` |
+| AC-18 | `AC-10 and AC-18 a student receives one available model suggestion without creating a booking` |
+| AC-19 | `AC-19 no matching free workstation returns a clear result and creates no booking` |
+| AC-20 | `AC-11 and AC-20 model failure and invalid output fall back to the first matching available slot` |
+| AC-21 | `AC-21 an unauthenticated visitor receives no suggestion data` |
+| AC-22 | `AC-22 an unsupported activity returns HTTP 422 without a model call or booking` |
+| AC-23 | `AC-23 migration adds validated activity types and backfills existing workstations` |
 | AC-14 | `AC-14 an unauthenticated visitor is redirected from the page and receives no API data` |
 | AC-15 | `AC-15 the seeded student sees their booking details and no other student rows` |
 | AC-16 | `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` |
 | AC-17 | `AC-17 an incorrect password gives a readable error and no authenticated session` |
-| AC-18 | |
-| AC-19 | |
-| AC-20 | |
-| AC-21 | |
-| AC-22 | |
-| AC-23 | |
 
 ## Spec vs result
 Database checkpoint: migration `001_initial_schema.sql` created the six initial tables, and the student confirmed the local database contains two seeded labs and three workstations. Migration `002_seed_state.sql` adds the marker that prevents deleted demo bookings from being recreated. Automated tests verify the schema, seed rows, overlap trigger, sign-in/session behavior, per-user booking list, availability, booking limits, conflicts and cancellation/ownership rules.
 
 Exercise 2's requested sign-in-and-list slice is implemented and checked. AC-14's unauthenticated checks returned HTTP 401 for `/api/my-bookings` and HTTP 302 to `/login` for `/my-bookings`; AC-15's booking details and AC-16's deletion result were confirmed by the student in the browser. The bookings screen showed demo booking ID 2 (PC-02, Lab 1250) absent after deletion and reload. The availability form and slots were also visually checked by the student. The student chose not to create a persistent booking in their local database, so booking confirmation in that UI was not manually checked; API behavior for AC-2 through AC-7 is covered by automated tests.
 
-Changed after checking: AC-16 now also says the startup seed must not recreate a deleted booking. The first implementation could have reseeded deleted rows; the migration 002 seed marker and test `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` enforce the observed behavior. The availability, booking and cancellation features (AC-2 through AC-7) are additional scope beyond Exercise 2's required first slice. The Exercise 3 staff dashboard and AC-8/9 are implemented and covered by automated tests. Google OAuth fake-client flows are tested; the student reports that Google OAuth credentials and the local callback were configured and that sign-in with a test account succeeded. The agent did not independently observe the browser session. The model feature and project MCP tools remain for later approved steps.
+Changed after checking: AC-16 now also says the startup seed must not recreate a deleted booking. The first implementation could have reseeded deleted rows; the migration 002 seed marker and test `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` enforce the observed behavior. The availability, booking and cancellation features (AC-2 through AC-7) are additional scope beyond Exercise 2's required first slice. The Exercise 3 staff dashboard and AC-8/9 are implemented and covered by automated tests. Google OAuth fake-client flows are tested; the student reports that Google OAuth credentials and the local callback were configured and that sign-in with a test account succeeded. The agent did not independently observe the browser session. The Gemini suggestion UI, authenticated API and deterministic fallback are implemented and covered by fake-client tests; no real Gemini request was made. Project MCP tools remain for a later approved step.

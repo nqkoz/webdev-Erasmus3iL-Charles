@@ -2,6 +2,10 @@ const availabilityForm = document.querySelector('#availability-form');
 const dateInput = document.querySelector('#booking-date');
 const availabilityStatus = document.querySelector('#availability-status');
 const availabilityList = document.querySelector('#availability-list');
+const suggestionForm = document.querySelector('#suggestion-form');
+const activityInput = document.querySelector('#activity-type');
+const suggestionStatus = document.querySelector('#suggestion-status');
+const suggestionResult = document.querySelector('#suggestion-result');
 
 function sofiaToday() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -70,6 +74,51 @@ async function loadAvailability(date) {
   }
 }
 
+function showSuggestion(result) {
+  suggestionResult.replaceChildren();
+  suggestionResult.hidden = true;
+  suggestionStatus.classList.remove('form-message');
+  if (!result.suggestion) {
+    suggestionStatus.textContent = result.message;
+    return;
+  }
+
+  const heading = document.createElement('h3');
+  heading.id = 'suggested-slot-heading';
+  heading.textContent = `Suggested: ${result.suggestion.slot.labName} · ${result.suggestion.slot.workstationName}`;
+  const details = document.createElement('p');
+  details.textContent = `${result.suggestion.slot.labLocation} · ${formatBookingTime(result.suggestion.slot.startsAt)} – ${formatBookingTime(result.suggestion.slot.endsAt)}`;
+  const reason = document.createElement('p');
+  reason.textContent = result.suggestion.reason;
+  suggestionResult.append(heading, details, reason);
+  suggestionResult.hidden = false;
+  suggestionStatus.textContent = result.fallbackMessage || 'Suggestion ready. Choose the matching slot below to book it.';
+}
+
+async function requestSuggestion(date, activityType, button) {
+  button.disabled = true;
+  suggestionResult.hidden = true;
+  suggestionStatus.classList.remove('form-message');
+  suggestionStatus.textContent = 'Finding a suggestion…';
+  try {
+    const response = await fetch('/api/slot-suggestions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ activityType, date }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'A suggestion could not be created.');
+    await loadAvailability(date);
+    showSuggestion(result);
+  } catch (error) {
+    suggestionStatus.textContent = error.message;
+    suggestionStatus.classList.add('form-message');
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function bookSlot(slot, button) {
   button.disabled = true;
   availabilityStatus.classList.remove('form-message');
@@ -95,6 +144,13 @@ async function bookSlot(slot, button) {
 availabilityForm.addEventListener('submit', (event) => {
   event.preventDefault();
   if (dateInput.reportValidity()) loadAvailability(dateInput.value);
+});
+
+suggestionForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!dateInput.reportValidity()) return;
+  const button = suggestionForm.querySelector('button[type="submit"]');
+  requestSuggestion(dateInput.value, activityInput.value, button);
 });
 
 dateInput.value = sofiaToday();

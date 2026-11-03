@@ -42,9 +42,9 @@ that talks to the database directly is a second, unguarded way into your data: n
 
 ## The model feature
 <!-- Provider, env var, and the call site. -->
-- The provider is named in exactly one file:
+- The Gemini provider integration and provider name live in `src/services/geminiClient.js`; `GEMINI_API_KEY` is read there and the service calls Gemini through its injected client.
 - The key comes from an environment variable and is never committed or logged.
-- Every call has a timeout and a deterministic fallback, so the app still works when the provider is down or rate-limited.
+- Every call has an 8-second timeout and a deterministic fallback, so the app still works when the provider is down or rate-limited.
 - The model's output is re-checked against real data before anything is saved or shown.
 - Tests never call the provider: they pass in a fake client.
 

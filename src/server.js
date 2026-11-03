@@ -7,7 +7,11 @@ const bookingService = require('./services/bookingService');
 const { createAuthRouter } = require('./routes/authRoutes');
 const { createBookingRouter } = require('./routes/bookingRoutes');
 
-function createApp(database, { nowProvider = () => new Date(), googleClient } = {}) {
+function createApp(database, {
+  nowProvider = () => new Date(),
+  googleClient,
+  slotSuggestionClient,
+} = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use((request, response, next) => {
@@ -20,7 +24,7 @@ function createApp(database, { nowProvider = () => new Date(), googleClient } = 
   app.use(express.json({ limit: '10kb' }));
   app.use(express.static(path.resolve(__dirname, '../public')));
   app.use(createAuthRouter(database, { googleClient }));
-  app.use(createBookingRouter(database, { nowProvider }));
+  app.use(createBookingRouter(database, { nowProvider, slotSuggestionClient }));
   app.get('/', (request, response) => response.redirect(302, '/login'));
   app.use((error, request, response, next) => {
     console.error('Request failed:', error.message);

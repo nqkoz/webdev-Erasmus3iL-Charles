@@ -201,6 +201,24 @@ button:hover {
   margin-top: 0;
 }
 
+.suggestion-section {
+  margin-bottom: var(--space-5);
+}
+
+.suggestion-section h2 {
+  font-size: 1.2rem;
+}
+
+.suggestion-form {
+  grid-template-columns: minmax(12rem, 1fr) auto;
+  align-items: end;
+}
+
+.suggestion-form button {
+  width: auto;
+  margin-top: 0;
+}
+
 .bookings-page h2 {
   font-size: 1.2rem;
 }
@@ -255,15 +273,18 @@ button:hover {
     flex-direction: column;
   }
 
-  .date-form {
+  .date-form,
+  .suggestion-form {
     grid-template-columns: 1fr;
   }
 
-  .date-form label {
+  .date-form label,
+  .suggestion-form label {
     grid-column: auto;
   }
 
-  .date-form button {
+  .date-form button,
+  .suggestion-form button {
     width: 100%;
   }
 }

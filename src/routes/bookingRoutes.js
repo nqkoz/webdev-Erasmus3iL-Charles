@@ -1,10 +1,14 @@
 const express = require('express');
 const bookingService = require('../services/bookingService');
+const slotSuggestionService = require('../services/slotSuggestionService');
 const { requireUser } = require('./authRoutes');
 const { availabilityPage } = require('../views/availabilityPage');
 const { staffPage } = require('../views/staffPage');
 
-function createBookingRouter(database, { nowProvider = () => new Date() } = {}) {
+function createBookingRouter(database, {
+  nowProvider = () => new Date(),
+  slotSuggestionClient,
+} = {}) {
   const router = express.Router();
 
   router.get('/availability', requireUser(database), (request, response) => {
@@ -56,6 +60,21 @@ function createBookingRouter(database, { nowProvider = () => new Date() } = {}) 
   router.get('/api/availability', requireUser(database, { api: true }), (request, response, next) => {
     try {
       return response.json(bookingService.listAvailableSlots(database, request.user.id, request.query.date, nowProvider()));
+    } catch (error) {
+      return sendBookingError(error, response, next);
+    }
+  });
+
+  router.post('/api/slot-suggestions', requireUser(database, { api: true }), async (request, response, next) => {
+    try {
+      const suggestion = await slotSuggestionService.suggestSlot(
+        database,
+        request.user.id,
+        request.body,
+        nowProvider(),
+        slotSuggestionClient,
+      );
+      return response.json(suggestion);
     } catch (error) {
       return sendBookingError(error, response, next);
     }
