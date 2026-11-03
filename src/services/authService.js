@@ -7,9 +7,17 @@ const {
 } = require('node:crypto');
 const userRepository = require('../data/userRepository');
 const sessionRepository = require('../data/sessionRepository');
+const oauthAccountRepository = require('../data/oauthAccountRepository');
 
 const scryptAsync = promisify(scrypt);
 const sessionLifetimeMs = 7 * 24 * 60 * 60 * 1000;
+
+class GoogleAccountError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'GoogleAccountError';
+  }
+}
 
 async function hashPassword(password) {
   if (typeof password !== 'string' || password.length < 8) {
@@ -60,6 +68,40 @@ async function authenticate(database, email, password) {
   return { id: user.id, email: user.email, role: user.role };
 }
 
+function authenticateGoogle(database, profile) {
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)
+    || typeof profile.sub !== 'string' || !profile.sub.trim() || profile.sub.length > 255
+    || profile.email_verified !== true
+    || typeof profile.email !== 'string') {
+    throw new GoogleAccountError('Google must provide a verified e-mail address.');
+  }
+
+  const email = profile.email.trim().toLowerCase();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new GoogleAccountError('Google did not provide a valid e-mail address.');
+  }
+  const subject = profile.sub.trim();
+
+  try {
+    return database.transaction(() => {
+      const linkedUser = oauthAccountRepository.findUserByGoogleSubject(database, subject);
+      if (linkedUser) return linkedUser;
+
+      const existingUser = userRepository.findByEmail(database, email);
+      const userId = existingUser
+        ? existingUser.id
+        : userRepository.createUser(database, { email, passwordHash: null, role: 'student' });
+      oauthAccountRepository.linkGoogleAccount(database, subject, userId);
+      return userRepository.findById(database, userId);
+    })();
+  } catch (error) {
+    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      throw new GoogleAccountError('This Google account cannot be linked to the requested account.');
+    }
+    throw error;
+  }
+}
+
 function hashSessionToken(token) {
   return createHash('sha256').update(token).digest('hex');
 }
@@ -86,7 +128,9 @@ function revokeSession(database, token) {
 }
 
 module.exports = {
+  GoogleAccountError,
   authenticate,
+  authenticateGoogle,
   createSession,
   ensureSeedStudent,
   getUserForSession,

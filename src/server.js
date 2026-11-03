@@ -7,7 +7,7 @@ const bookingService = require('./services/bookingService');
 const { createAuthRouter } = require('./routes/authRoutes');
 const { createBookingRouter } = require('./routes/bookingRoutes');
 
-function createApp(database, { nowProvider = () => new Date() } = {}) {
+function createApp(database, { nowProvider = () => new Date(), googleClient } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use((request, response, next) => {
@@ -19,7 +19,7 @@ function createApp(database, { nowProvider = () => new Date() } = {}) {
   app.use(express.urlencoded({ extended: false, limit: '10kb' }));
   app.use(express.json({ limit: '10kb' }));
   app.use(express.static(path.resolve(__dirname, '../public')));
-  app.use(createAuthRouter(database));
+  app.use(createAuthRouter(database, { googleClient }));
   app.use(createBookingRouter(database, { nowProvider }));
   app.get('/', (request, response) => response.redirect(302, '/login'));
   app.use((error, request, response, next) => {

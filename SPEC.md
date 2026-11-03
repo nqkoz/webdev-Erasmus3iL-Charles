@@ -31,8 +31,8 @@ Lab booking.
 
 ## Auth
 - Local: students sign in with e-mail and password; passwords are salted scrypt hashes and successful sign-in creates the application's ordinary session.
-- Provider: Google OAuth 2.0 authorization-code flow, handled on the server, creates the same kind of application session.
-- Linking: normalize e-mail addresses and link sign-in methods to one account only when Google reports `email_verified: true`; an unverified address is never linked to an existing account. Both sign-in methods resolve to the same user id and permissions.
+- Provider: Google OAuth 2.0 authorization-code flow, handled on the server with state validation, PKCE, an eight-second provider timeout and the same application session. The client secret stays in `GOOGLE_CLIENT_SECRET`.
+- Linking: normalize e-mail addresses and link sign-in methods to one account only when Google reports `email_verified: true`; an unverified address is never linked to an existing account. A new Google-only account is a student without a local password. Both sign-in methods resolve to the same user id and permissions.
 
 ## MCP tools
 | Tool | What it does | Who may call it |
@@ -47,7 +47,7 @@ Lab booking.
 Node.js 22 and Express provide JSON REST endpoints; plain HTML, CSS and JavaScript call them. Screens: sign-in, my bookings, workstation availability and booking, and the lab-staff dashboard. Every screen handles loading, empty, readable error and success states; the main flow is keyboard accessible, responsive at 380/768/1280 px, uses visible focus and design tokens, and meets 4.5:1 text contrast.
 
 ## Architecture
-Implemented student and staff request path: `public/my-bookings.js`, `public/availability.js` and `public/staff.js` → `src/routes/authRoutes.js` and `src/routes/bookingRoutes.js` → `src/services/authService.js` and `src/services/bookingService.js` → repositories in `src/data/` → SQLite migrations in `migrations/`. The project MCP tools are not implemented yet; when added, each must call these same service functions. The existing Exercise 1 `mcp-server/server.js` still reads its course JSON files directly and is not the Lab Booking data path.
+Implemented student and staff request path: `public/my-bookings.js`, `public/availability.js` and `public/staff.js` → `src/routes/authRoutes.js` and `src/routes/bookingRoutes.js` → `src/services/authService.js` and `src/services/bookingService.js` → repositories in `src/data/` → SQLite migrations in `migrations/`. Google sign-in uses `src/services/googleOAuthClient.js` and links verified provider identities through `src/data/oauthAccountRepository.js`; OAuth tests use fake clients and do not call Google. The project MCP tools are not implemented yet; when added, each must call these same service functions. The existing Exercise 1 `mcp-server/server.js` still reads its course JSON files directly and is not the Lab Booking data path.
 
 ## Acceptance criteria
 - [AC-1] A student who signs in with a local e-mail and password sees their account's bookings; the database stores only a salted password hash.
@@ -91,6 +91,7 @@ Implemented student and staff request path: `public/my-bookings.js`, `public/ava
 | AC-7 | `AC-7 cancelling another student’s booking returns HTTP 403 and leaves it active` |
 | AC-8 | `AC-8 only staff can create a lab and workstation and see the new rows` |
 | AC-9 | `AC-9 staff see all student bookings while students see only their own` |
+| AC-13 | `AC-13 verified Google sign-in links to the local user and creates the same session identity`; `AC-13 an unverified Google e-mail is not linked to an existing local account` |
 | AC-14 | `AC-14 an unauthenticated visitor is redirected from the page and receives no API data` |
 | AC-15 | `AC-15 the seeded student sees their booking details and no other student rows` |
 | AC-16 | `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` |
@@ -107,4 +108,4 @@ Database checkpoint: migration `001_initial_schema.sql` created the six initial 
 
 Exercise 2's requested sign-in-and-list slice is implemented and checked. AC-14's unauthenticated checks returned HTTP 401 for `/api/my-bookings` and HTTP 302 to `/login` for `/my-bookings`; AC-15's booking details and AC-16's deletion result were confirmed by the student in the browser. The bookings screen showed demo booking ID 2 (PC-02, Lab 1250) absent after deletion and reload. The availability form and slots were also visually checked by the student. The student chose not to create a persistent booking in their local database, so booking confirmation in that UI was not manually checked; API behavior for AC-2 through AC-7 is covered by automated tests.
 
-Changed after checking: AC-16 now also says the startup seed must not recreate a deleted booking. The first implementation could have reseeded deleted rows; the migration 002 seed marker and test `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` enforce the observed behavior. The availability, booking and cancellation features (AC-2 through AC-7) are additional scope beyond Exercise 2's required first slice. The Exercise 3 staff dashboard and AC-8/9 are implemented and covered by automated tests; Google OAuth, the model feature and project MCP tools remain for later approved steps.
+Changed after checking: AC-16 now also says the startup seed must not recreate a deleted booking. The first implementation could have reseeded deleted rows; the migration 002 seed marker and test `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` enforce the observed behavior. The availability, booking and cancellation features (AC-2 through AC-7) are additional scope beyond Exercise 2's required first slice. The Exercise 3 staff dashboard and AC-8/9 are implemented and covered by automated tests. Google OAuth's fake-client flows are implemented and covered by tests, but no real provider login has been attempted; the student's client credentials and registered callback URI still need a manual setup/verification. The model feature and project MCP tools remain for later approved steps.
