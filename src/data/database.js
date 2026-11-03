@@ -56,13 +56,13 @@ function seedReferenceData(database) {
     `).run(2, 'Lab 2310 - Networks', 'Building 2, floor 3');
 
     const insertWorkstation = database.prepare(`
-      INSERT INTO workstations (id, lab_id, name, description)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO workstations (id, lab_id, name, description, activity_type)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(id) DO NOTHING
     `);
-    insertWorkstation.run(1, 1, 'PC-01', 'Standard workstation for web development');
-    insertWorkstation.run(2, 1, 'PC-02', 'Standard workstation for web development');
-    insertWorkstation.run(3, 2, 'PC-01', 'Workstation for networking exercises');
+    insertWorkstation.run(1, 1, 'PC-01', 'Standard workstation for web development', 'web_cloud');
+    insertWorkstation.run(2, 1, 'PC-02', 'Standard workstation for web development', 'web_cloud');
+    insertWorkstation.run(3, 2, 'PC-01', 'Workstation for networking exercises', 'networking');
   })();
 }
 

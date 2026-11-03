@@ -70,6 +70,14 @@ Implemented student request path: `public/my-bookings.js` and `public/availabili
 - [AC-16] After a booking row is deleted from the local SQLite database, reloading `/my-bookings` removes that row from the displayed list and the seed process does not recreate it.
 - [AC-17] A visitor who submits an incorrect password sees a readable sign-in error, receives no authenticated session, and remains unable to access `/my-bookings`.
 
+### Slice 2: suggest a workstation slot
+- [AC-18] A signed-in student who requests a suggestion for a supported activity and date sees an available workstation, its lab, the time slot, and a short reason; no booking is created.
+- [AC-19] When no available workstation matches the requested activity, the suggestion endpoint returns HTTP 200 with a clear “no matching workstation” message, and no booking is created.
+- [AC-20] If Gemini is unavailable, returns an invalid slot, or fails, the system ignores that response and suggests the first available matching slot; if none matches, it reports no match. No booking is created.
+- [AC-21] A visitor without a session who requests a suggestion receives HTTP 401 and no suggestion data.
+- [AC-22] A signed-in student who submits an unsupported activity receives HTTP 422 and no suggestion or booking.
+- [AC-23] After the migration runs, every seeded workstation has an `activity_type` of `web_cloud` or `networking`, matching the activity supported by that workstation.
+
 ## Traceability
 <!-- Add a test reference as each acceptance criterion is implemented. -->
 | Criterion | Test |
@@ -85,6 +93,12 @@ Implemented student request path: `public/my-bookings.js` and `public/availabili
 | AC-15 | `AC-15 the seeded student sees their booking details and no other student rows` |
 | AC-16 | `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` |
 | AC-17 | `AC-17 an incorrect password gives a readable error and no authenticated session` |
+| AC-18 | |
+| AC-19 | |
+| AC-20 | |
+| AC-21 | |
+| AC-22 | |
+| AC-23 | |
 
 ## Spec vs result
 Database checkpoint: migration `001_initial_schema.sql` created the six initial tables, and the student confirmed the local database contains two seeded labs and three workstations. Migration `002_seed_state.sql` adds the marker that prevents deleted demo bookings from being recreated. Automated tests verify the schema, seed rows, overlap trigger, sign-in/session behavior, per-user booking list, availability, booking limits, conflicts and cancellation/ownership rules.
