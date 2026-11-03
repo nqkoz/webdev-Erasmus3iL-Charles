@@ -80,4 +80,14 @@ One entry per agent session, newest at the bottom. Be honest: what went wrong is
 - Changes made in plan review: expanded the initial suggestion-plus-three-tools scope to include staff and Google OAuth after the student requested the full Exercise 3 self-check; preserve the Exercise 1 server and do not weaken the course checker.
 - Step 2 checkpoint: implemented staff-only lab/workstation creation, staff workstation and all-bookings listings, protected `/staff` and `/api/staff/*` routes, role-aware login redirect, and the staff dashboard. The student committed this step as `9536a20 Staff: add dashboard and booking management`.
 - Step 3 checkpoint: implemented Google authorization-code sign-in with state and PKCE, a provider client with eight-second network timeouts, verified-email-only linking, passwordless student account creation and the existing application session. `npm.cmd test` passed 30 app tests and Exercise 1 MCP 12/12; `npm.cmd run coverage` passed 30 tests at 100% lines, branches and functions; `node checks/ex2.mjs` passed 32/32. OAuth tests use fake clients/stubbed fetch and make no Google requests. No `.env` or persistent database was inspected or modified.
-- Current step: step 3 only — Google OAuth and AC-13. Real Google credentials/callback setup and browser sign-in have not been verified. Await the student's diff review and commit before proceeding.
+- The student reviewed and committed step 3 as `c3e84c7 Google: add verified OAuth sign-in`.
+- At the time of the OAuth implementation commit, real provider credentials and browser sign-in had not yet been verified; see the following dated entry for the student's subsequent report.
+
+## 2026-11-03 · Verify Google OAuth setup
+
+- Goal: guide the student through configuring the Google OAuth test client and verify the end-to-end sign-in.
+- Delegated: none.
+- Checkpoints: the student reported creating a Google web OAuth client, registering `http://localhost:3000/auth/google/callback`, adding their test account and configuring the local `.env`. The student reported that the login page showed the Google button and that sign-in with the test account succeeded.
+- Went wrong: no shared browser page was available, so the agent did not independently observe the provider redirect or authenticated session. Treat the successful login as student-reported evidence.
+- Changed by hand: updated the project status and spec evidence to distinguish the student's report from independently observed test results. No credentials were requested in chat; `.env` was not read or modified by the agent.
+- Remaining: stop the temporary test server; the Gemini suggestion step and Lab Booking MCP server are still outstanding.
