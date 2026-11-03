@@ -47,7 +47,7 @@ Lab booking.
 Node.js 22 and Express provide JSON REST endpoints; plain HTML, CSS and JavaScript call them. Screens: sign-in, my bookings, workstation availability and booking, and the lab-staff dashboard. Every screen handles loading, empty, readable error and success states; the main flow is keyboard accessible, responsive at 380/768/1280 px, uses visible focus and design tokens, and meets 4.5:1 text contrast.
 
 ## Architecture
-Implemented student request path: `public/my-bookings.js` and `public/availability.js` → `src/routes/authRoutes.js` and `src/routes/bookingRoutes.js` → `src/services/authService.js` and `src/services/bookingService.js` → repositories in `src/data/` → SQLite migrations in `migrations/`. The project MCP tools are not implemented yet; when added, each must call these same service functions. The existing Exercise 1 `mcp-server/server.js` still reads its course JSON files directly and is not the Lab Booking data path.
+Implemented student and staff request path: `public/my-bookings.js`, `public/availability.js` and `public/staff.js` → `src/routes/authRoutes.js` and `src/routes/bookingRoutes.js` → `src/services/authService.js` and `src/services/bookingService.js` → repositories in `src/data/` → SQLite migrations in `migrations/`. The project MCP tools are not implemented yet; when added, each must call these same service functions. The existing Exercise 1 `mcp-server/server.js` still reads its course JSON files directly and is not the Lab Booking data path.
 
 ## Acceptance criteria
 - [AC-1] A student who signs in with a local e-mail and password sees their account's bookings; the database stores only a salted password hash.
@@ -89,6 +89,8 @@ Implemented student request path: `public/my-bookings.js` and `public/availabili
 | AC-5 | `AC-5 a fourth future active booking is refused without inserting a row` |
 | AC-6 | `AC-6 cancelling an owned future booking marks it cancelled and frees its slot` |
 | AC-7 | `AC-7 cancelling another student’s booking returns HTTP 403 and leaves it active` |
+| AC-8 | `AC-8 only staff can create a lab and workstation and see the new rows` |
+| AC-9 | `AC-9 staff see all student bookings while students see only their own` |
 | AC-14 | `AC-14 an unauthenticated visitor is redirected from the page and receives no API data` |
 | AC-15 | `AC-15 the seeded student sees their booking details and no other student rows` |
 | AC-16 | `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` |
@@ -105,4 +107,4 @@ Database checkpoint: migration `001_initial_schema.sql` created the six initial 
 
 Exercise 2's requested sign-in-and-list slice is implemented and checked. AC-14's unauthenticated checks returned HTTP 401 for `/api/my-bookings` and HTTP 302 to `/login` for `/my-bookings`; AC-15's booking details and AC-16's deletion result were confirmed by the student in the browser. The bookings screen showed demo booking ID 2 (PC-02, Lab 1250) absent after deletion and reload. The availability form and slots were also visually checked by the student. The student chose not to create a persistent booking in their local database, so booking confirmation in that UI was not manually checked; API behavior for AC-2 through AC-7 is covered by automated tests.
 
-Changed after checking: AC-16 now also says the startup seed must not recreate a deleted booking. The first implementation could have reseeded deleted rows; the migration 002 seed marker and test `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` enforce the observed behavior. The availability, booking and cancellation features (AC-2 through AC-7) are additional scope beyond Exercise 2's required first slice. Google OAuth, the model feature, staff management/dashboard and project MCP tools are specified for the wider project but not built in this exercise.
+Changed after checking: AC-16 now also says the startup seed must not recreate a deleted booking. The first implementation could have reseeded deleted rows; the migration 002 seed marker and test `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` enforce the observed behavior. The availability, booking and cancellation features (AC-2 through AC-7) are additional scope beyond Exercise 2's required first slice. The Exercise 3 staff dashboard and AC-8/9 are implemented and covered by automated tests; Google OAuth, the model feature and project MCP tools remain for later approved steps.

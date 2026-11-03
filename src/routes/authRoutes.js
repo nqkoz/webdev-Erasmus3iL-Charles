@@ -48,7 +48,7 @@ function createAuthRouter(database, { isProduction = process.env.NODE_ENV === 'p
 
       const session = authService.createSession(database, user.id);
       response.setHeader('Set-Cookie', `${sessionCookieName}=${session.token}; ${cookieOptions(isProduction)}`);
-      return response.redirect(303, '/my-bookings');
+      return response.redirect(303, user.role === 'staff' ? '/staff' : '/my-bookings');
     } catch (error) {
       return next(error);
     }

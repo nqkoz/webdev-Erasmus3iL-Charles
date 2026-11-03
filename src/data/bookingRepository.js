@@ -20,12 +20,33 @@ function listForUser(database, userId) {
   `).all(userId);
 }
 
+function listAllBookings(database) {
+  return database.prepare(`
+    SELECT
+      bookings.id,
+      bookings.user_id AS userId,
+      users.email AS studentEmail,
+      bookings.starts_at AS startsAt,
+      bookings.ends_at AS endsAt,
+      bookings.status,
+      labs.name AS labName,
+      labs.location AS labLocation,
+      workstations.name AS workstationName
+    FROM bookings
+    JOIN users ON users.id = bookings.user_id
+    JOIN workstations ON workstations.id = bookings.workstation_id
+    JOIN labs ON labs.id = workstations.lab_id
+    ORDER BY bookings.starts_at, bookings.id
+  `).all();
+}
+
 function listWorkstations(database) {
   return database.prepare(`
     SELECT
       workstations.id AS workstationId,
       workstations.name AS workstationName,
       workstations.description AS workstationDescription,
+      workstations.activity_type AS activityType,
       labs.id AS labId,
       labs.name AS labName,
       labs.location AS labLocation
@@ -33,6 +54,28 @@ function listWorkstations(database) {
     JOIN labs ON labs.id = workstations.lab_id
     ORDER BY labs.name, workstations.name
   `).all();
+}
+
+function createLabAndWorkstation(database, {
+  labName,
+  labLocation,
+  workstationName,
+  workstationDescription,
+  activityType,
+}) {
+  return database.transaction(() => {
+    const labResult = database.prepare(`
+      INSERT INTO labs (name, location) VALUES (?, ?)
+    `).run(labName, labLocation);
+    const workstationResult = database.prepare(`
+      INSERT INTO workstations (lab_id, name, description, activity_type)
+      VALUES (?, ?, ?, ?)
+    `).run(Number(labResult.lastInsertRowid), workstationName, workstationDescription, activityType);
+    return {
+      labId: Number(labResult.lastInsertRowid),
+      workstationId: Number(workstationResult.lastInsertRowid),
+    };
+  })();
 }
 
 function listConflictingForRange(database, startsAt, endsAt) {
@@ -108,10 +151,12 @@ module.exports = {
   countForUser,
   countFutureActiveForUser,
   createForUser,
+  createLabAndWorkstation,
   findBooking,
   findWorkstation,
   listConflictingForRange,
   listForUser,
+  listAllBookings,
   listWorkstations,
   seedDemoBookings,
 };

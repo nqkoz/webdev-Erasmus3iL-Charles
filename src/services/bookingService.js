@@ -17,6 +17,53 @@ function listMyBookings(database, userId) {
   return bookingRepository.listForUser(database, userId);
 }
 
+function listAllBookingsForStaff(database, userId) {
+  ensureStaff(database, userId);
+  return bookingRepository.listAllBookings(database);
+}
+
+function listWorkstationsForStaff(database, userId) {
+  ensureStaff(database, userId);
+  return bookingRepository.listWorkstations(database);
+}
+
+function createLabAndWorkstation(database, userId, input) {
+  ensureStaff(database, userId);
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new BookingError(400, 'Enter valid lab and workstation details.');
+  }
+
+  const labName = requiredText(input.labName, 'Lab name', 100);
+  const labLocation = requiredText(input.labLocation, 'Lab location', 200);
+  const workstationName = requiredText(input.workstationName, 'Workstation name', 100);
+  const workstationDescription = requiredText(input.workstationDescription, 'Workstation description', 500);
+  if (!['web_cloud', 'networking'].includes(input.activityType)) {
+    throw new BookingError(400, 'Choose a valid workstation activity.');
+  }
+
+  try {
+    return bookingRepository.createLabAndWorkstation(database, {
+      labName,
+      labLocation,
+      workstationName,
+      workstationDescription,
+      activityType: input.activityType,
+    });
+  } catch (error) {
+    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      throw new BookingError(409, 'A lab or workstation with that name already exists.');
+    }
+    throw error;
+  }
+}
+
+function requiredText(value, label, maximumLength) {
+  if (typeof value !== 'string' || value.trim().length === 0 || value.trim().length > maximumLength) {
+    throw new BookingError(400, `${label} must contain 1 to ${maximumLength} characters.`);
+  }
+  return value.trim();
+}
+
 function ensureDemoBookings(database, userId, now = new Date()) {
   if (!Number.isInteger(userId) || userId < 1) throw new Error('A seeded student is required');
 
@@ -134,6 +181,13 @@ function ensureStudent(database, userId) {
   if (user.role !== 'student') throw new BookingError(403, 'Student access is required.');
 }
 
+function ensureStaff(database, userId) {
+  if (!Number.isInteger(userId) || userId < 1) throw new BookingError(401, 'Sign in first.');
+  const user = userRepository.findById(database, userId);
+  if (!user) throw new BookingError(401, 'Sign in first.');
+  if (user.role !== 'staff') throw new BookingError(403, 'Staff access is required.');
+}
+
 function validateBookableDate(dateValue, now) {
   const date = parseDate(`${dateValue.getUTCFullYear()}-${pad(dateValue.getUTCMonth() + 1)}-${pad(dateValue.getUTCDate())}`);
   const today = getLocalDateParts(now);
@@ -230,8 +284,12 @@ module.exports = {
   BookingError,
   cancelBooking,
   createBooking,
+  createLabAndWorkstation,
   ensureDemoBookings,
+  ensureStaff,
   ensureStudent,
+  listAllBookingsForStaff,
   listAvailableSlots,
   listMyBookings,
+  listWorkstationsForStaff,
 };
