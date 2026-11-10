@@ -10,7 +10,8 @@
     "start": "node --env-file-if-exists=.env src/server.js",
     "test": "node --test && node mcp-server/check.mjs -- node mcp-server/server.js",
     "coverage": "node --test --experimental-test-coverage --test-coverage-include='src/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80",
-    "mcp": "node mcp-server/server.js"
+    "mcp": "node mcp-server/server.js",
+    "mcp:lab-booking": "node --env-file-if-exists=.env mcp-server/labBookingServer.js"
   },
   "repository": {
     "type": "git",

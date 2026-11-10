@@ -5,6 +5,12 @@
       "type": "stdio",
       "command": "node",
       "args": ["mcp-server/server.js"]
+    },
+    "lab-booking": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["--env-file-if-exists=.env", "mcp-server/labBookingServer.js"],
+      "cwd": "${workspaceFolder}"
     }
   }
 }

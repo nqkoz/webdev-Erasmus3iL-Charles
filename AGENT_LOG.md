@@ -83,7 +83,7 @@ One entry per agent session, newest at the bottom. Be honest: what went wrong is
 - The student reviewed and committed step 3 as `c3e84c7 Google: add verified OAuth sign-in`.
 - At the time of the OAuth implementation commit, real provider credentials and browser sign-in had not yet been verified; see the following dated entry for the student's subsequent report.
 - Step 4 checkpoint: added the authenticated slot-suggestion API and UI, Gemini client with an 8-second timeout, non-personal availability-only request payload, slot-id/reason validation and deterministic first-match fallback. `npm.cmd test` passed 42 application tests and Exercise 1 MCP 12/12; `npm.cmd run coverage` passed all 42 tests at 100% lines, branches and functions; `node checks/ex2.mjs` passed 32/32. All model tests used stubs; no real provider request was made. The changed-file check confirmed `.env` was not modified.
-- Current step: step 4 only — slot suggestions, AC-10/11 and AC-18..22. Await the student's diff review and commit before starting the Lab Booking MCP server step.
+- At the time of this entry, step 4 was current. The student later reviewed and committed that step; see the dated follow-up entries for subsequent work.
 
 ## 2026-11-03 · Verify Google OAuth setup
 
@@ -93,3 +93,14 @@ One entry per agent session, newest at the bottom. Be honest: what went wrong is
 - Went wrong: no shared browser page was available, so the agent did not independently observe the provider redirect or authenticated session. Treat the successful login as student-reported evidence.
 - Changed by hand: updated the project status and spec evidence to distinguish the student's report from independently observed test results. No credentials were requested in chat; `.env` was not read or modified by the agent.
 - Remaining: the student reported stopping the temporary test server. The Gemini feature is now implemented and awaits review/commit; the Lab Booking MCP server remains outstanding.
+
+## 2026-11-10 · Exercise 3 Lab Booking MCP server
+
+- Goal: implement the Exercise 3 project MCP server without changing the student-authored Exercise 1 server or its tools.
+- User decisions: approved a separate Lab Booking server with `list_free_slots`, `my_bookings`, `book_slot`, `cancel_booking` and `suggest_slot`; approved staff read-only access to free-slot listings while keeping booking, cancellation and suggestions student-only.
+- Implemented: the new JSON-RPC server authenticates every call against the user's active `lab_session`, then calls the same booking and suggestion services used by HTTP. Added VS Code/Gemini MCP configuration, the `mcp:lab-booking` command, and documentation for the session token and separate servers. The existing Exercise 1 configuration and MCP command remain in place.
+- Authorization: `bookingService.listAvailableSlots` now allows students and staff, as required by `SPEC.md`; student-only service guards still apply to bookings, cancellations and suggestions.
+- Evidence: AC-12 tests cover tool registration/protocol behavior, parity with HTTP, staff read-only permissions, expired sessions and refusing startup without a token. The Exercise 1 server tests remain unchanged.
+- Verification: targeted MCP and booking tests passed 12/12; `npm.cmd test` passed 47/47 app tests and Exercise 1 MCP 12/12; `npm.cmd run coverage` passed all 47 tests at 100% lines, branches and functions; `node checks/ex2.mjs` passed 32/32; `node checks/ex3.mjs` passed 18/18 when run with a temporary local Windows shim resolving `npm` to `npm.cmd` (the shim was removed afterward).
+- Safety: `.env` was not read or modified; no credentials were sent to a provider. No commit was created.
+- Remaining: the student should review and commit this step before any further work.

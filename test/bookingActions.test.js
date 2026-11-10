@@ -174,13 +174,14 @@ test('AC-7 cancelling another student’s booking returns HTTP 403 and leaves it
   assert.equal(database.prepare('SELECT status FROM bookings WHERE id = 1').get().status, 'active');
 });
 
-test('a staff account cannot use student booking operations', async (t) => {
+test('staff can view availability but cannot use student booking operations', async (t) => {
   const { baseUrl, database } = await createFixture(t);
   const staffToken = await signIn(baseUrl, 'staff@example.test', 'staff-password-123');
   const availability = await fetch(`${baseUrl}/api/availability?date=2026-11-02`, {
     headers: jsonHeaders(staffToken),
   });
-  assert.equal(availability.status, 403);
+  assert.equal(availability.status, 200);
+  assert.ok((await availability.json()).length > 0);
 
   const booking = await fetch(`${baseUrl}/api/bookings`, {
     method: 'POST',

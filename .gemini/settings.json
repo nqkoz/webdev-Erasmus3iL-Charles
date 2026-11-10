@@ -7,6 +7,10 @@
       "command": "node",
       "args": ["mcp-server/server.js"],
       "env": { "MCP_TOKEN": "$MCP_TOKEN" }
+    },
+    "lab-booking": {
+      "command": "node",
+      "args": ["--env-file-if-exists=.env", "mcp-server/labBookingServer.js"]
     }
   }
 }

@@ -18,6 +18,18 @@ On Windows PowerShell, use `npm.cmd run --silent mcp` or `node mcp-server/server
 
 The repository's `.vscode/mcp.json` registers this local server as `my-project`. Open the repository folder in VS Code, open Copilot Chat in **Agent** mode, and check the tools menu for `find_lecture` and `get_student_info`. If you edit the MCP configuration or server, restart the MCP server from that menu before checking again. No API key or `MCP_TOKEN` is needed for this Exercise 1 server.
 
+## Lab Booking project server (Exercise 3)
+
+The separate `lab-booking` server exposes the five tools listed in `SPEC.md` and calls the same service layer as the HTTP API. The existing Exercise 1 server and its two course-data tools remain unchanged.
+
+1. Sign in to Lab Booking locally, then copy the value of the `lab_session` cookie from the browser's developer tools. Never paste the value into chat, a committed file, or a terminal command.
+2. Store that value as `MCP_TOKEN` in the ignored local `.env` file. It is the user's ordinary session and expires after seven days; update it after signing in again.
+3. Restart `lab-booking` in the VS Code MCP server list. The configuration runs Node with `--env-file-if-exists=.env`, so the token stays local.
+
+For a terminal session, run `npm run --silent mcp:lab-booking` (PowerShell: `npm.cmd run --silent mcp:lab-booking`). The process requires a valid current session token and opens the same SQLite database as the web app. stdout is reserved for JSON-RPC; diagnostics go to stderr. Do not use the Exercise 1 `mcp` command for Lab Booking.
+
+The MCP tools are `list_free_slots`, `my_bookings`, `book_slot`, `cancel_booking` and `suggest_slot`. Students can use all five; staff can only list free slots. Every call validates the configured session and calls the shared application services, which enforce the same access and booking rules as HTTP.
+
 Try asking Copilot, without naming a tool, "What does lecture 5 cover?" It should use `find_lecture` and return the lecture title and topics. This is a manual check in the VS Code UI; a passing self-check below only verifies the protocol and does not prove that Copilot connected.
 
 ## The two tools
@@ -70,6 +82,6 @@ Server → client: {"jsonrpc":"2.0","id":6,"error":{"code":-32601,"message":"Unk
 
 With the original `find_lecture` description, the student asked Copilot “What does lecture 5 cover?” and reported a visible `find_lecture` call; the answer was “What the agent built, part 1 covers HTTP, REST vs. GraphQL, data modeling, ORMs, and application layers.” After changing only the description to `Return course lecture information` and confirming that `my-project` had restarted, the student asked the same question in a fresh chat, reported that `find_lecture` was still called, and received “Lecture 5 covers HTTP, REST vs. GraphQL, data modeling, ORMs, and application layers.” Tool choice did not change in these two observed trials; the wording of the answers differed, and per-session usage statistics were unavailable.
 
-## Where this goes next
+## Project server architecture
 
-Keep this folder for Club events. The web application belongs outside mcp-server/. Future event tools must call the same service functions as HTTP routes and act through an ordinary user session. These project services and authentication do not exist yet in Exercise 1.
+The project server is kept separate from the student-authored Exercise 1 protocol server. It validates `MCP_TOKEN` through the session service, dispatches each project tool to an existing booking or suggestion service, and writes no SQL of its own. Both front doors therefore reach the same repositories, migrations, and SQLite data.

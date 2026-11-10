@@ -27,6 +27,15 @@ function listWorkstationsForStaff(database, userId) {
   return bookingRepository.listWorkstations(database);
 }
 
+function ensureAvailabilityAccess(database, userId) {
+  if (!Number.isInteger(userId) || userId < 1) throw new BookingError(401, 'Sign in first.');
+  const user = userRepository.findById(database, userId);
+  if (!user) throw new BookingError(401, 'Sign in first.');
+  if (!['student', 'staff'].includes(user.role)) {
+    throw new BookingError(403, 'Student or staff access is required.');
+  }
+}
+
 function createLabAndWorkstation(database, userId, input) {
   ensureStaff(database, userId);
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -80,7 +89,7 @@ function ensureDemoBookings(database, userId, now = new Date()) {
 }
 
 function listAvailableSlots(database, userId, requestedDate, now = new Date()) {
-  ensureStudent(database, userId);
+  ensureAvailabilityAccess(database, userId);
   const date = parseDate(requestedDate);
   const today = getLocalDateParts(now);
   const dayOffset = Math.round((date.getTime() - Date.UTC(today.year, today.month - 1, today.day)) / 86400000);
@@ -286,6 +295,7 @@ module.exports = {
   createBooking,
   createLabAndWorkstation,
   ensureDemoBookings,
+  ensureAvailabilityAccess,
   ensureStaff,
   ensureStudent,
   listAllBookingsForStaff,
