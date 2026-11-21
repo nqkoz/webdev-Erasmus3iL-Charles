@@ -84,7 +84,7 @@ async function openDatabase({
   }
 }
 
-async function initializeDatabase(database, migrationsDirectory) {
+async function initializeDatabase(database, migrationsDirectory = defaultMigrationsDirectory) {
   await database.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       name TEXT PRIMARY KEY,
