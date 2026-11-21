@@ -1,9 +1,6 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
-const { openDatabase } = require('../src/data/database');
+const { createTestDatabase } = require('../src/data/database');
 const userRepository = require('../src/data/userRepository');
 const authService = require('../src/services/authService');
 const { createApp } = require('../src/server');
@@ -14,15 +11,14 @@ const fixedNow = new Date('2026-10-30T12:00:00.000Z');
 const testDate = '2026-11-02';
 
 async function createFixture(t, { slotSuggestionClient } = {}) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lab-booking-suggestions-'));
-  const database = openDatabase({ filename: path.join(directory, 'test.db') });
+  const database = await createTestDatabase();
   const passwordHash = await authService.hashPassword('correct-horse-battery');
-  const studentId = userRepository.createUser(database, {
+  const studentId = await userRepository.createUser(database, {
     email: 'student@example.test',
     passwordHash,
     role: 'student',
   });
-  const otherStudentId = userRepository.createUser(database, {
+  const otherStudentId = await userRepository.createUser(database, {
     email: 'other@example.test',
     passwordHash: await authService.hashPassword('another-correct-password'),
     role: 'student',
@@ -34,8 +30,7 @@ async function createFixture(t, { slotSuggestionClient } = {}) {
   await new Promise((resolve) => server.once('listening', resolve));
   t.after(async () => {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    database.close();
-    fs.rmSync(directory, { recursive: true, force: true });
+    await database.close();
   });
   return {
     database,
@@ -80,8 +75,8 @@ function slotClient(suggestion, onCall = () => {}) {
 test('AC-20 the suggestion service replaces a nonexistent model slot with a real available slot', async (t) => {
   const { database, studentId } = await createFixture(t);
 
-  const availableSlots = bookingService
-    .listAvailableSlots(database, studentId, testDate, fixedNow)
+  const availableSlots = (await bookingService
+    .listAvailableSlots(database, studentId, testDate, fixedNow))
     .filter((slot) => slot.activityType === 'networking');
 
   assert.ok(availableSlots.length > 0, 'the fixture must contain an available networking slot');
@@ -117,7 +112,7 @@ test('AC-10 and AC-18 a student receives one available model suggestion without 
   assert.equal(pageResponse.status, 200);
   assert.match(page, /id="suggestion-form"/);
   assert.match(page, /never books a slot automatically/);
-  const before = database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count;
+  const before = (await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count;
 
   const response = await suggest(baseUrl, token, { activityType: 'networking', date: testDate });
   const result = await response.json();
@@ -131,8 +126,8 @@ test('AC-10 and AC-18 a student receives one available model suggestion without 
   assert.equal(modelInput.date, testDate);
   assert.equal(modelInput.activityType, 'networking');
   assert.ok(modelInput.slots.every((slot) => !('userId' in slot) && !('studentEmail' in slot)));
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count, before);
-  assert.equal(database.prepare('SELECT id FROM users WHERE id = ?').get(studentId).id, studentId);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count, before);
+  assert.equal((await database.query('SELECT id FROM users WHERE id = $1', [studentId])).rows[0].id, studentId);
 });
 
 test('AC-19 no matching free workstation returns a clear result and creates no booking', async (t) => {
@@ -149,21 +144,21 @@ test('AC-19 no matching free workstation returns a clear result and creates no b
     '2026-11-02T12:00:00.000Z', '2026-11-02T13:00:00.000Z',
     '2026-11-02T14:00:00.000Z', '2026-11-02T15:00:00.000Z',
   ];
-  const insert = database.prepare(`
+  const insert = `
     INSERT INTO bookings (user_id, workstation_id, starts_at, ends_at, status)
-    VALUES (?, 3, ?, ?, 'active')
-  `);
+    VALUES ($1, 3, $2, $3, 'active')
+  `;
   for (const start of startsAt) {
-    insert.run(otherStudentId, start, new Date(Date.parse(start) + 60 * 60 * 1000).toISOString());
+    await database.query(insert, [otherStudentId, start, new Date(Date.parse(start) + 60 * 60 * 1000).toISOString()]);
   }
-  const before = database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count;
+  const before = (await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count;
 
   const response = await suggest(baseUrl, token, { activityType: 'networking', date: testDate });
   const result = await response.json();
   assert.equal(response.status, 200);
   assert.equal(result.suggestion, null);
   assert.match(result.message, /No matching workstation is available/);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count, before);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count, before);
 });
 
 test('AC-11 and AC-20 model failure and invalid output fall back to the first matching available slot', async (t) => {
@@ -176,7 +171,7 @@ test('AC-11 and AC-20 model failure and invalid output fall back to the first ma
     await t.test(label, async (subtest) => {
       const { baseUrl, database } = await createFixture(subtest, { slotSuggestionClient: client });
       const token = await signIn(baseUrl);
-      const before = database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count;
+      const before = (await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count;
       const response = await suggest(baseUrl, token, { activityType: 'networking', date: testDate });
       const result = await response.json();
 
@@ -184,7 +179,7 @@ test('AC-11 and AC-20 model failure and invalid output fall back to the first ma
       assert.equal(result.suggestion.slot.workstationId, 3);
       assert.equal(result.suggestion.slot.startsAt, '2026-11-02T06:00:00.000Z');
       assert.match(result.fallbackMessage, /Gemini/);
-      assert.equal(database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count, before);
+      assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count, before);
     });
   }
 });
@@ -205,9 +200,9 @@ test('AC-22 an unsupported activity returns HTTP 422 without a model call or boo
     slotSuggestionClient: slotClient({}, () => assert.fail('The model must not be called for invalid preferences.')),
   });
   const token = await signIn(baseUrl);
-  const before = database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count;
+  const before = (await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count;
   const response = await suggest(baseUrl, token, { activityType: 'robotics', date: testDate });
   assert.equal(response.status, 422);
   assert.match((await response.json()).error, /supported activity/);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count, before);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count, before);
 });

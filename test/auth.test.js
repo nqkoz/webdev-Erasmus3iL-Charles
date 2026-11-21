@@ -1,18 +1,14 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
-const { openDatabase } = require('../src/data/database');
+const { createTestDatabase } = require('../src/data/database');
 const userRepository = require('../src/data/userRepository');
 const authService = require('../src/services/authService');
 const { createApp } = require('../src/server');
 
 async function startTestServer(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lab-booking-auth-'));
-  const database = openDatabase({ filename: path.join(directory, 'test.db') });
+  const database = await createTestDatabase();
   const passwordHash = await authService.hashPassword('correct-horse-battery');
-  userRepository.createUser(database, {
+  await userRepository.createUser(database, {
     email: 'student@example.test',
     passwordHash,
     role: 'student',
@@ -21,8 +17,7 @@ async function startTestServer(t) {
   await new Promise((resolve) => server.once('listening', resolve));
   t.after(async () => {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    database.close();
-    fs.rmSync(directory, { recursive: true, force: true });
+    await database.close();
   });
   return `http://127.0.0.1:${server.address().port}`;
 }
@@ -85,12 +80,8 @@ test('AC-1 a valid local sign-in creates an opaque HttpOnly session cookie', asy
 });
 
 test('a seeded student is inserted once and its password is hashed', async (t) => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lab-booking-seed-'));
-  const database = openDatabase({ filename: path.join(directory, 'test.db') });
-  t.after(() => {
-    database.close();
-    fs.rmSync(directory, { recursive: true, force: true });
-  });
+  const database = await createTestDatabase();
+  t.after(() => database.close());
 
   assert.equal(await authService.ensureSeedStudent(database, {
     email: ' Student@Lab-Booking.Local ',
@@ -101,7 +92,7 @@ test('a seeded student is inserted once and its password is hashed', async (t) =
     password: 'another-private-password',
   }), false);
 
-  const user = userRepository.findByEmail(database, 'student@lab-booking.local');
+  const user = await userRepository.findByEmail(database, 'student@lab-booking.local');
   assert.equal(user.role, 'student');
   assert.notEqual(user.passwordHash, 'private-test-password');
   assert.equal(await authService.verifyPassword('private-test-password', user.passwordHash), true);

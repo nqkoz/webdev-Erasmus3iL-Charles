@@ -18,8 +18,8 @@ Lab booking.
 - No recurring bookings, group bookings or reservations longer than one hour.
 
 ## Constraints
-- Node.js 22, Express, SQLite, numbered SQL migrations, and plain HTML, CSS and JavaScript; all application rules are enforced by the service layer.
-- Passwords are stored only as salted scrypt hashes; session identifiers are random, stored hashed in SQLite, and sent only in HttpOnly cookies.
+- Node.js 22, Express, PostgreSQL on Neon, numbered SQL migrations in `migrations/postgres/`, and plain HTML, CSS and JavaScript; all application rules are enforced by the service layer.
+- Passwords are stored only as salted scrypt hashes; session identifiers are random, stored hashed in PostgreSQL, and sent only in HttpOnly cookies.
 - Booking times use the Europe/Sofia time zone. Slots are one hour, Monday to Friday from 08:00 through 18:00; students may book up to 30 days ahead and hold at most three future active bookings.
 - A workstation cannot have overlapping active bookings. Students can cancel only their own bookings, and only before a booking starts; staff permissions are checked in services.
 
@@ -61,7 +61,7 @@ The `GET /api/availability` route in `src/routes/bookingRoutes.js` checks the se
 `listAvailableSlots` checks that the user is a student or staff member, validates that the date is today through 30 days ahead and a weekday, and considers one-hour slots from 08:00 to 18:00 in Europe/Sofia. It excludes slots that have already started and slots overlapping an active booking. It asks `src/data/bookingRepository.js` for workstations and conflicting bookings. The repository's SQL joins workstations to labs and reads active bookings overlapping the selected day. The service uses those results to produce the available slots.
 
 ### 5. MCP integration
-For `list_free_slots`, `mcp-server/labBookingServer.js` resolves the user from the configured MCP session token, then calls the same `bookingService.listAvailableSlots` function as the HTTP route. The MCP server has no SQL query of its own; it uses the service and repository layers against the same SQLite database.
+For `list_free_slots`, `mcp-server/labBookingServer.js` resolves the user from the configured MCP session token, then calls the same `bookingService.listAvailableSlots` function as the HTTP route. The MCP server has no SQL query of its own; it uses the service and repository layers against the same PostgreSQL database.
 
 ### 6. Front-end layering trade-off
 `public/availability.js` handles the API request, renders the results and updates the page's status state in one file. This is less separated than having distinct browser API, view and state modules. It is kept together because this is a small page using plain JavaScript, and adding separate modules for it would add indirection without much benefit; the business rules and SQL remain in their service and repository layers.
@@ -86,7 +86,7 @@ The other MCP tools call `listMyBookings`, `createBooking`, `cancelBooking` and 
 ### Slice 1: sign-in and my bookings
 - [AC-14] A visitor who opens `/my-bookings` without a session is redirected to `/login`, and `GET /api/my-bookings` without a session returns HTTP 401 without booking data.
 - [AC-15] A student who signs in with the seeded local account sees the seeded booking rows for their own account, with lab, workstation, date, time and status; another student's seeded rows are absent.
-- [AC-16] After a booking row is deleted from the local SQLite database, reloading `/my-bookings` removes that row from the displayed list and the seed process does not recreate it.
+- [AC-16] After a booking row is deleted from the database, reloading `/my-bookings` removes that row from the displayed list and the seed process does not recreate it.
 - [AC-17] A visitor who submits an incorrect password sees a readable sign-in error, receives no authenticated session, and remains unable to access `/my-bookings`.
 
 ### Slice 2: suggest a workstation slot
@@ -104,7 +104,7 @@ The other MCP tools call `listMyBookings`, `createBooking`, `cancelBooking` and 
 | AC-1 | `AC-1 a valid local sign-in creates an opaque HttpOnly session cookie`; salted-hash verification test |
 | AC-2 | `AC-2 availability lists future workstation slots and excludes active overlaps` |
 | AC-3 | `AC-3 booking a free slot returns confirmation and stores an active row` |
-| AC-4 | `AC-4 a booking conflict returns HTTP 409 and stores no overlapping row`; `AC-4 SQLite rejects overlapping active bookings for a workstation` |
+| AC-4 | `AC-4 a booking conflict returns HTTP 409 and stores no overlapping row`; `AC-4 PostgreSQL rejects overlapping active bookings for a workstation` |
 | AC-5 | `AC-5 a fourth future active booking is refused without inserting a row` |
 | AC-6 | `AC-6 cancelling an owned future booking marks it cancelled and frees its slot` |
 | AC-7 | `AC-7 cancelling another student’s booking returns HTTP 403 and leaves it active` |
@@ -119,7 +119,7 @@ The other MCP tools call `listMyBookings`, `createBooking`, `cancelBooking` and 
 | AC-20 | `AC-11 and AC-20 model failure and invalid output fall back to the first matching available slot` |
 | AC-21 | `AC-21 an unauthenticated visitor receives no suggestion data` |
 | AC-22 | `AC-22 an unsupported activity returns HTTP 422 without a model call or booking` |
-| AC-23 | `AC-23 migration adds validated activity types and backfills existing workstations` |
+| AC-23 | `AC-23 PostgreSQL migration adds validated activity types and backfills workstations` |
 | AC-14 | `AC-14 an unauthenticated visitor is redirected from the page and receives no API data` |
 | AC-15 | `AC-15 the seeded student sees their booking details and no other student rows` |
 | AC-16 | `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` |
@@ -131,3 +131,5 @@ Database checkpoint: migration `001_initial_schema.sql` created the six initial 
 Exercise 2's requested sign-in-and-list slice is implemented and checked. AC-14's unauthenticated checks returned HTTP 401 for `/api/my-bookings` and HTTP 302 to `/login` for `/my-bookings`; AC-15's booking details and AC-16's deletion result were confirmed by the student in the browser. The bookings screen showed demo booking ID 2 (PC-02, Lab 1250) absent after deletion and reload. The availability form and slots were also visually checked by the student. The student chose not to create a persistent booking in their local database, so booking confirmation in that UI was not manually checked; API behavior for AC-2 through AC-7 is covered by automated tests.
 
 Changed after checking: AC-16 now also says the startup seed must not recreate a deleted booking. The first implementation could have reseeded deleted rows; the migration 002 seed marker and test `AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it` enforce the observed behavior. The availability, booking and cancellation features (AC-2 through AC-7) are additional scope beyond Exercise 2's required first slice. The Exercise 3 staff dashboard and AC-8/9 are implemented and covered by automated tests. Google OAuth fake-client flows are tested; the student reports that Google OAuth credentials and the local callback were configured and that sign-in with a test account succeeded. The agent did not independently observe the browser session. The Gemini suggestion UI, authenticated API and deterministic fallback are implemented and covered by fake-client tests; no real Gemini request was made. The separate Lab Booking MCP server and its five shared-service tools are implemented and covered by AC-12 tests; the original student-authored Exercise 1 MCP server remains separate and unchanged.
+
+Exercise 4 implementation checkpoint: the application now connects through `DATABASE_URL` to PostgreSQL and applies the separate migrations in `migrations/postgres/`; the earlier SQLite migrations remain unchanged, and existing local SQLite records have not been copied to Neon. Tests use in-memory PGlite. The app includes a database-aware `/health`, a short 404 response, generic error responses without stack traces, and a Node 22 Dockerfile. If PostgreSQL is unavailable during startup, the HTTP server remains available, `/health` returns 503 until migrations and seeding finish, and initialization retries every five seconds. The test suite also checks missing `DATABASE_URL`, migration/backfill behavior, and overlap constraints. Automated deployment readiness does not establish that a Neon database or Render service exists: the student still needs to configure provider dashboards and secrets, build/run the image, deploy, verify persistence and failure/rollback behavior, collect UI/waterfall evidence, fill in `docs/UI.md`, `course.json` and their own `READINESS.md`, then check the live deployment.

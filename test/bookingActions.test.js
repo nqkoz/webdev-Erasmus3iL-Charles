@@ -1,9 +1,6 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
-const { openDatabase } = require('../src/data/database');
+const { createTestDatabase } = require('../src/data/database');
 const userRepository = require('../src/data/userRepository');
 const bookingService = require('../src/services/bookingService');
 const authService = require('../src/services/authService');
@@ -12,34 +9,32 @@ const { createApp } = require('../src/server');
 const fixedNow = new Date('2026-10-30T12:00:00.000Z');
 
 async function createFixture(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lab-booking-actions-'));
-  const database = openDatabase({ filename: path.join(directory, 'test.db') });
+  const database = await createTestDatabase();
   const studentHash = await authService.hashPassword('student-password-123');
   const otherHash = await authService.hashPassword('other-student-password');
   const staffHash = await authService.hashPassword('staff-password-123');
-  const studentId = userRepository.createUser(database, {
+  const studentId = await userRepository.createUser(database, {
     email: 'student@example.test',
     passwordHash: studentHash,
     role: 'student',
   });
-  const otherStudentId = userRepository.createUser(database, {
+  const otherStudentId = await userRepository.createUser(database, {
     email: 'other@example.test',
     passwordHash: otherHash,
     role: 'student',
   });
-  userRepository.createUser(database, {
+  await userRepository.createUser(database, {
     email: 'staff@example.test',
     passwordHash: staffHash,
     role: 'staff',
   });
-  bookingService.ensureDemoBookings(database, studentId, fixedNow);
+  await bookingService.ensureDemoBookings(database, studentId, fixedNow);
 
   const server = createApp(database, { nowProvider: () => new Date(fixedNow) }).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   t.after(async () => {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    database.close();
-    fs.rmSync(directory, { recursive: true, force: true });
+    await database.close();
   });
   return {
     database,
@@ -106,7 +101,8 @@ test('AC-3 booking a free slot returns confirmation and stores an active row', a
   assert.equal(response.status, 201);
   assert.equal(confirmation.status, 'active');
   assert.equal(confirmation.workstationId, 1);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM bookings WHERE user_id = ? AND status = ?').get(studentId, 'active').count, 3);
+  const activeCount = await database.query('SELECT COUNT(*)::integer AS count FROM bookings WHERE user_id = $1 AND status = $2', [studentId, 'active']);
+  assert.equal(activeCount.rows[0].count, 3);
 });
 
 test('AC-4 a booking conflict returns HTTP 409 and stores no overlapping row', async (t) => {
@@ -121,7 +117,7 @@ test('AC-4 a booking conflict returns HTTP 409 and stores no overlapping row', a
 
   assert.equal(response.status, 409);
   assert.equal(result.error, 'This slot is no longer available');
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count, 2);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count, 2);
 });
 
 test('AC-5 a fourth future active booking is refused without inserting a row', async (t) => {
@@ -141,7 +137,8 @@ test('AC-5 a fourth future active booking is refused without inserting a row', a
   });
   assert.equal(fourthResponse.status, 409);
   assert.equal((await fourthResponse.json()).error, 'You have reached the booking limit');
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM bookings WHERE user_id = ? AND status = 'active'").get(studentId).count, 3);
+  const activeCount = await database.query("SELECT COUNT(*)::integer AS count FROM bookings WHERE user_id = $1 AND status = 'active'", [studentId]);
+  assert.equal(activeCount.rows[0].count, 3);
 });
 
 test('AC-6 cancelling an owned future booking marks it cancelled and frees its slot', async (t) => {
@@ -153,7 +150,7 @@ test('AC-6 cancelling an owned future booking marks it cancelled and frees its s
   });
   assert.equal(cancellation.status, 200);
   assert.deepEqual(await cancellation.json(), { id: 1, status: 'cancelled' });
-  assert.equal(database.prepare('SELECT status FROM bookings WHERE id = 1').get().status, 'cancelled');
+  assert.equal((await database.query('SELECT status FROM bookings WHERE id = 1')).rows[0].status, 'cancelled');
 
   const availability = await fetch(`${baseUrl}/api/availability?date=2026-11-02`, {
     headers: jsonHeaders(token),
@@ -171,7 +168,7 @@ test('AC-7 cancelling another student’s booking returns HTTP 403 and leaves it
   });
 
   assert.equal(response.status, 403);
-  assert.equal(database.prepare('SELECT status FROM bookings WHERE id = 1').get().status, 'active');
+  assert.equal((await database.query('SELECT status FROM bookings WHERE id = 1')).rows[0].status, 'active');
 });
 
 test('staff can view availability but cannot use student booking operations', async (t) => {
@@ -189,5 +186,5 @@ test('staff can view availability but cannot use student booking operations', as
     body: JSON.stringify({ workstationId: 1, startsAt: '2026-11-02T08:00:00.000Z' }),
   });
   assert.equal(booking.status, 403);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count, 2);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count, 2);
 });

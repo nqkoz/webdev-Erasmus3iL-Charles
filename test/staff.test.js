@@ -1,50 +1,45 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
-const { openDatabase } = require('../src/data/database');
+const { createTestDatabase } = require('../src/data/database');
 const userRepository = require('../src/data/userRepository');
 const authService = require('../src/services/authService');
 const bookingService = require('../src/services/bookingService');
 const { createApp } = require('../src/server');
 
 async function createFixture(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lab-booking-staff-'));
-  const database = openDatabase({ filename: path.join(directory, 'test.db') });
+  const database = await createTestDatabase();
   const studentHash = await authService.hashPassword('student-password-123');
   const otherHash = await authService.hashPassword('other-student-password');
   const staffHash = await authService.hashPassword('staff-password-123');
-  const studentId = userRepository.createUser(database, {
+  const studentId = await userRepository.createUser(database, {
     email: 'student@example.test',
     passwordHash: studentHash,
     role: 'student',
   });
-  const otherStudentId = userRepository.createUser(database, {
+  const otherStudentId = await userRepository.createUser(database, {
     email: 'other@example.test',
     passwordHash: otherHash,
     role: 'student',
   });
-  const staffId = userRepository.createUser(database, {
+  const staffId = await userRepository.createUser(database, {
     email: 'staff@example.test',
     passwordHash: staffHash,
     role: 'staff',
   });
-  database.prepare(`
+  await database.query(`
     INSERT INTO bookings (user_id, workstation_id, starts_at, ends_at, status)
-    VALUES (?, ?, ?, ?, 'active')
-  `).run(studentId, 1, '2026-11-02T08:00:00.000Z', '2026-11-02T09:00:00.000Z');
-  database.prepare(`
+    VALUES ($1, $2, $3, $4, 'active')
+  `, [studentId, 1, '2026-11-02T08:00:00.000Z', '2026-11-02T09:00:00.000Z']);
+  await database.query(`
     INSERT INTO bookings (user_id, workstation_id, starts_at, ends_at, status)
-    VALUES (?, ?, ?, ?, 'active')
-  `).run(otherStudentId, 2, '2026-11-02T08:00:00.000Z', '2026-11-02T09:00:00.000Z');
+    VALUES ($1, $2, $3, $4, 'active')
+  `, [otherStudentId, 2, '2026-11-02T08:00:00.000Z', '2026-11-02T09:00:00.000Z']);
 
   const server = createApp(database).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   t.after(async () => {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    database.close();
-    fs.rmSync(directory, { recursive: true, force: true });
+    await database.close();
   });
   return {
     database,
@@ -81,16 +76,16 @@ test('AC-8 only staff can create a lab and workstation and see the new rows', as
     activityType: 'web_cloud',
   };
 
-  assert.throws(
-    () => bookingService.createLabAndWorkstation(database, studentId, input),
+  await assert.rejects(
+    bookingService.createLabAndWorkstation(database, studentId, input),
     (error) => error.status === 403,
   );
-  assert.deepEqual(bookingService.createLabAndWorkstation(database, staffId, input), {
+  assert.deepEqual(await bookingService.createLabAndWorkstation(database, staffId, input), {
     labId: 3,
     workstationId: 4,
   });
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM labs WHERE name = 'Lab 3000 - Robotics'").get().count, 1);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM workstations WHERE name = 'Robot-01'").get().count, 1);
+  assert.equal((await database.query("SELECT COUNT(*)::integer AS count FROM labs WHERE name = 'Lab 3000 - Robotics'")).rows[0].count, 1);
+  assert.equal((await database.query("SELECT COUNT(*)::integer AS count FROM workstations WHERE name = 'Robot-01'")).rows[0].count, 1);
 
   const studentToken = await signIn(baseUrl, 'student@example.test', 'student-password-123');
   const forbiddenPage = await fetch(`${baseUrl}/staff`, {
@@ -103,7 +98,7 @@ test('AC-8 only staff can create a lab and workstation and see the new rows', as
     body: JSON.stringify({ ...input, labName: 'Forbidden Lab', workstationName: 'No-01' }),
   });
   assert.equal(forbidden.status, 403);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM labs WHERE name = 'Forbidden Lab'").get().count, 0);
+  assert.equal((await database.query("SELECT COUNT(*)::integer AS count FROM labs WHERE name = 'Forbidden Lab'")).rows[0].count, 0);
 
   const staffToken = await signIn(baseUrl, 'staff@example.test', 'staff-password-123');
   const page = await fetch(`${baseUrl}/staff`, { headers: { cookie: `lab_session=${staffToken}` } });
@@ -119,7 +114,7 @@ test('AC-8 only staff can create a lab and workstation and see the new rows', as
     }),
   });
   assert.equal(staffCreation.status, 201);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM labs WHERE name = 'Lab 3001 - Robotics'").get().count, 1);
+  assert.equal((await database.query("SELECT COUNT(*)::integer AS count FROM labs WHERE name = 'Lab 3001 - Robotics'")).rows[0].count, 1);
   const workstationList = await fetch(`${baseUrl}/api/staff/workstations`, {
     headers: headers(staffToken),
   });
@@ -131,16 +126,16 @@ test('AC-8 only staff can create a lab and workstation and see the new rows', as
 
 test('AC-9 staff see all student bookings while students see only their own', async (t) => {
   const { baseUrl, database, studentId, otherStudentId, staffId } = await createFixture(t);
-  database.prepare(`
+  await database.query(`
     INSERT INTO bookings (user_id, workstation_id, starts_at, ends_at, status)
-    VALUES (?, ?, ?, ?, 'active')
-  `).run(studentId, 3, '2026-11-03T08:00:00.000Z', '2026-11-03T09:00:00.000Z');
+    VALUES ($1, $2, $3, $4, 'active')
+  `, [studentId, 3, '2026-11-03T08:00:00.000Z', '2026-11-03T09:00:00.000Z']);
 
-  const staffBookings = bookingService.listAllBookingsForStaff(database, staffId);
+  const staffBookings = await bookingService.listAllBookingsForStaff(database, staffId);
   assert.equal(staffBookings.length, 3);
   assert.deepEqual(new Set(staffBookings.map((booking) => booking.userId)), new Set([studentId, otherStudentId]));
-  assert.throws(
-    () => bookingService.listAllBookingsForStaff(database, studentId),
+  await assert.rejects(
+    bookingService.listAllBookingsForStaff(database, studentId),
     (error) => error.status === 403,
   );
 

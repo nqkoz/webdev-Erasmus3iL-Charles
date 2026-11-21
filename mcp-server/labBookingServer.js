@@ -119,25 +119,25 @@ function createLabBookingMcpServer(database, token, {
     if (!tool) return protocolError(message.id, -32602, `Unknown tool: ${params.name}`);
 
     try {
-      const user = authService.getUserForSession(database, token);
+      const user = await authService.getUserForSession(database, token);
       if (!user) return textResult(message.id, 'Sign in again; the configured MCP session is missing or expired.', true);
       const args = params.arguments || {};
       let result;
       switch (params.name) {
         case 'list_free_slots':
-          result = bookingService.listAvailableSlots(database, user.id, args.date, nowProvider());
+          result = await bookingService.listAvailableSlots(database, user.id, args.date, nowProvider());
           break;
         case 'my_bookings':
-          result = bookingService.listMyBookings(database, user.id);
+          result = await bookingService.listMyBookings(database, user.id);
           break;
         case 'book_slot':
-          result = bookingService.createBooking(database, user.id, {
+          result = await bookingService.createBooking(database, user.id, {
             workstationId: args.workstationId,
             startsAt: args.startsAt,
           }, nowProvider());
           break;
         case 'cancel_booking':
-          result = bookingService.cancelBooking(database, user.id, args.bookingId, nowProvider());
+          result = await bookingService.cancelBooking(database, user.id, args.bookingId, nowProvider());
           break;
         case 'suggest_slot':
           result = await slotSuggestionService.suggestSlot(database, user.id, {
@@ -170,7 +170,7 @@ async function runServer() {
 
   let database;
   try {
-    database = openDatabase();
+    database = await openDatabase();
   } catch (error) {
     console.error(`Could not open the Lab Booking database: ${error.message}`);
     return 1;
@@ -195,7 +195,9 @@ async function runServer() {
     });
   });
   input.on('close', () => {
-    queue.finally(() => database.close());
+    queue = queue.then(() => database.close()).catch((error) => {
+      console.error(`Could not close the Lab Booking database: ${error.message}`);
+    });
   });
   return 0;
 }

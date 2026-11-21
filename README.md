@@ -18,12 +18,12 @@ The course setup page explains accounts, sign-in, free limits and what to do if 
 
 | Path | What it is for |
 |---|---|
-| `.devcontainer/` | The workspace definition: Node 22, Python 3.12, SQLite, Docker, GitHub CLI, Gemini CLI |
-| `.gemini/settings.json` | Tells Gemini CLI to read `AGENTS.md`, and where it finds your MCP servers (Exercise 1) |
+| `.devcontainer/` | The workspace definition: Node 22, Python 3.12, SQLite tools for the original migrations, Docker, GitHub CLI, Gemini CLI |
+| `.gemini/settings.json` | Tells Gemini CLI to read `AGENTS.md`, and where it finds both MCP servers |
 | `.vscode/mcp.json` | The same for Copilot, if you use it (the key is `servers`) |
 | `.github/workflows/ci.yml` | Runs your tests, the coverage gate, the MCP conformance check and the spec check on every push |
 | `AGENTS.md` | Instructions your agent reads every session |
-| `SPEC.md` | Your project specification (Exercise 2) |
+| `SPEC.md` | Your project specification and architecture evidence (Exercises 2–4) |
 | `AGENT_LOG.md`, `USAGE.md` | The logs you keep from Exercise 1 on |
 | `mcp-server/` | Exercise 1, with `lectures.json`, `messages.jsonl` and the self-check `check.mjs` |
 | `checks/` | One self-check per exercise: `node checks/ex2.mjs`, `ex3`, `ex4`, `ex5`, plus `project.mjs` before the defence |
@@ -31,6 +31,7 @@ The course setup page explains accounts, sign-in, free limits and what to do if 
 | `DEFENSE.md` | Your notes for the defence (Exercise 5) |
 | `.env.example` | Every environment variable your app needs, with placeholder values |
 | `course.json` | How to start your MCP server, and where your deployment answers |
+| `Dockerfile` | Builds the Node 22 production image used for Exercise 4 |
 
 ## Fill in `course.json` first
 

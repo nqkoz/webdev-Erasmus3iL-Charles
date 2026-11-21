@@ -1,9 +1,6 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
-const { openDatabase } = require('../src/data/database');
+const { createTestDatabase } = require('../src/data/database');
 const userRepository = require('../src/data/userRepository');
 const bookingRepository = require('../src/data/bookingRepository');
 const bookingService = require('../src/services/bookingService');
@@ -11,33 +8,31 @@ const authService = require('../src/services/authService');
 const { createApp } = require('../src/server');
 
 async function createFixture(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lab-booking-list-'));
-  const database = openDatabase({ filename: path.join(directory, 'test.db') });
+  const database = await createTestDatabase();
   const studentHash = await authService.hashPassword('student-password-123');
   const otherHash = await authService.hashPassword('other-student-password');
-  const studentId = userRepository.createUser(database, {
+  const studentId = await userRepository.createUser(database, {
     email: 'student@example.test',
     passwordHash: studentHash,
     role: 'student',
   });
-  const otherStudentId = userRepository.createUser(database, {
+  const otherStudentId = await userRepository.createUser(database, {
     email: 'other@example.test',
     passwordHash: otherHash,
     role: 'student',
   });
 
-  assert.equal(bookingService.ensureDemoBookings(database, studentId, new Date('2026-10-30T12:00:00.000Z')), true);
-  database.prepare(`
+  assert.equal(await bookingService.ensureDemoBookings(database, studentId, new Date('2026-10-30T12:00:00.000Z')), true);
+  await database.query(`
     INSERT INTO bookings (user_id, workstation_id, starts_at, ends_at, status)
-    VALUES (?, 3, '2026-11-03T08:00:00.000Z', '2026-11-03T09:00:00.000Z', 'active')
-  `).run(otherStudentId);
+    VALUES ($1, 3, '2026-11-03T08:00:00.000Z', '2026-11-03T09:00:00.000Z', 'active')
+  `, [otherStudentId]);
 
   const server = createApp(database).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   t.after(async () => {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    database.close();
-    fs.rmSync(directory, { recursive: true, force: true });
+    await database.close();
   });
   return { database, studentId, baseUrl: `http://127.0.0.1:${server.address().port}` };
 }
@@ -72,8 +67,8 @@ test('AC-15 the seeded student sees their booking details and no other student r
   assert.equal(bookings.length, 2);
   assert.ok(bookings.every((booking) => booking.labName === 'Lab 1250 - Web and Cloud'));
   assert.ok(bookings.every((booking) => booking.workstationName && booking.startsAt && booking.endsAt && booking.status === 'active'));
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM bookings').get().count, 3);
-  assert.equal(bookingRepository.countForUser(database, studentId), 2);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM bookings')).rows[0].count, 3);
+  assert.equal(await bookingRepository.countForUser(database, studentId), 2);
 });
 
 test('AC-16 deleting a booking row removes it from the refreshed booking list and does not reseed it', async (t) => {
@@ -84,8 +79,8 @@ test('AC-16 deleting a booking row removes it from the refreshed booking list an
   const beforeDeletion = await firstResponse.json();
   assert.equal(beforeDeletion.length, 2);
 
-  database.prepare('DELETE FROM bookings WHERE id = ? AND user_id = ?').run(beforeDeletion[0].id, studentId);
-  assert.equal(bookingService.ensureDemoBookings(database, studentId, new Date('2026-10-30T12:00:00.000Z')), false);
+  await database.query('DELETE FROM bookings WHERE id = $1 AND user_id = $2', [beforeDeletion[0].id, studentId]);
+  assert.equal(await bookingService.ensureDemoBookings(database, studentId, new Date('2026-10-30T12:00:00.000Z')), false);
 
   const reloadResponse = await fetch(`${baseUrl}/api/my-bookings`, { headers });
   const afterDeletion = await reloadResponse.json();

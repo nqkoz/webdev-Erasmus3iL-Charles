@@ -26,7 +26,7 @@ The separate `lab-booking` server exposes the five tools listed in `SPEC.md` and
 2. Store that value as `MCP_TOKEN` in the ignored local `.env` file. It is the user's ordinary session and expires after seven days; update it after signing in again.
 3. Restart `lab-booking` in the VS Code MCP server list. The configuration runs Node with `--env-file-if-exists=.env`, so the token stays local.
 
-For a terminal session, run `npm run --silent mcp:lab-booking` (PowerShell: `npm.cmd run --silent mcp:lab-booking`). The process requires a valid current session token and opens the same SQLite database as the web app. stdout is reserved for JSON-RPC; diagnostics go to stderr. Do not use the Exercise 1 `mcp` command for Lab Booking.
+For a terminal session, run `npm run --silent mcp:lab-booking` (PowerShell: `npm.cmd run --silent mcp:lab-booking`). The process requires a valid current session token and `DATABASE_URL`, then opens the same PostgreSQL database as the web app. stdout is reserved for JSON-RPC; diagnostics go to stderr. Do not use the Exercise 1 `mcp` command for Lab Booking.
 
 The MCP tools are `list_free_slots`, `my_bookings`, `book_slot`, `cancel_booking` and `suggest_slot`. Students can use all five; staff can only list free slots. Every call validates the configured session and calls the shared application services, which enforce the same access and booking rules as HTTP.
 
@@ -84,4 +84,4 @@ With the original `find_lecture` description, the student asked Copilot “What 
 
 ## Project server architecture
 
-The project server is kept separate from the student-authored Exercise 1 protocol server. It validates `MCP_TOKEN` through the session service, dispatches each project tool to an existing booking or suggestion service, and writes no SQL of its own. Both front doors therefore reach the same repositories, migrations, and SQLite data.
+The project server is kept separate from the student-authored Exercise 1 protocol server. It validates `MCP_TOKEN` through the session service, dispatches each project tool to an existing booking or suggestion service, and writes no SQL of its own. Both front doors therefore reach the same repositories, PostgreSQL migrations in `migrations/postgres/`, and data.

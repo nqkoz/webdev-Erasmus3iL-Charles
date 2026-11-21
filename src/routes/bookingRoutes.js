@@ -15,51 +15,51 @@ function createBookingRouter(database, {
     response.type('html').send(availabilityPage());
   });
 
-  router.get('/staff', requireUser(database), (request, response, next) => {
+  router.get('/staff', requireUser(database), async (request, response, next) => {
     try {
-      bookingService.ensureStaff(database, request.user.id);
+      await bookingService.ensureStaff(database, request.user.id);
       return response.type('html').send(staffPage());
     } catch (error) {
       return sendPageError(error, response, next);
     }
   });
 
-  router.get('/api/staff/bookings', requireUser(database, { api: true }), (request, response, next) => {
+  router.get('/api/staff/bookings', requireUser(database, { api: true }), async (request, response, next) => {
     try {
-      return response.json(bookingService.listAllBookingsForStaff(database, request.user.id));
+      return response.json(await bookingService.listAllBookingsForStaff(database, request.user.id));
     } catch (error) {
       return sendBookingError(error, response, next);
     }
   });
 
-  router.get('/api/staff/workstations', requireUser(database, { api: true }), (request, response, next) => {
+  router.get('/api/staff/workstations', requireUser(database, { api: true }), async (request, response, next) => {
     try {
-      return response.json(bookingService.listWorkstationsForStaff(database, request.user.id));
+      return response.json(await bookingService.listWorkstationsForStaff(database, request.user.id));
     } catch (error) {
       return sendBookingError(error, response, next);
     }
   });
 
-  router.post('/api/staff/workstations', requireUser(database, { api: true }), (request, response, next) => {
+  router.post('/api/staff/workstations', requireUser(database, { api: true }), async (request, response, next) => {
     try {
-      const created = bookingService.createLabAndWorkstation(database, request.user.id, request.body);
+      const created = await bookingService.createLabAndWorkstation(database, request.user.id, request.body);
       return response.status(201).json(created);
     } catch (error) {
       return sendBookingError(error, response, next);
     }
   });
 
-  router.get('/api/my-bookings', requireUser(database, { api: true }), (request, response, next) => {
+  router.get('/api/my-bookings', requireUser(database, { api: true }), async (request, response, next) => {
     try {
-      return response.json(bookingService.listMyBookings(database, request.user.id));
+      return response.json(await bookingService.listMyBookings(database, request.user.id));
     } catch (error) {
       return sendBookingError(error, response, next);
     }
   });
 
-  router.get('/api/availability', requireUser(database, { api: true }), (request, response, next) => {
+  router.get('/api/availability', requireUser(database, { api: true }), async (request, response, next) => {
     try {
-      return response.json(bookingService.listAvailableSlots(database, request.user.id, request.query.date, nowProvider()));
+      return response.json(await bookingService.listAvailableSlots(database, request.user.id, request.query.date, nowProvider()));
     } catch (error) {
       return sendBookingError(error, response, next);
     }
@@ -80,18 +80,18 @@ function createBookingRouter(database, {
     }
   });
 
-  router.post('/api/bookings', requireUser(database, { api: true }), (request, response, next) => {
+  router.post('/api/bookings', requireUser(database, { api: true }), async (request, response, next) => {
     try {
-      const booking = bookingService.createBooking(database, request.user.id, request.body, nowProvider());
+      const booking = await bookingService.createBooking(database, request.user.id, request.body, nowProvider());
       return response.status(201).json(booking);
     } catch (error) {
       return sendBookingError(error, response, next);
     }
   });
 
-  router.post('/api/bookings/:id/cancel', requireUser(database, { api: true }), (request, response, next) => {
+  router.post('/api/bookings/:id/cancel', requireUser(database, { api: true }), async (request, response, next) => {
     try {
-      const booking = bookingService.cancelBooking(database, request.user.id, Number(request.params.id), nowProvider());
+      const booking = await bookingService.cancelBooking(database, request.user.id, Number(request.params.id), nowProvider());
       return response.json(booking);
     } catch (error) {
       return sendBookingError(error, response, next);

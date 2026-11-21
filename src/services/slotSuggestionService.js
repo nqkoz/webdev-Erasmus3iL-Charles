@@ -6,13 +6,13 @@ const fallbackMessage = 'Gemini could not provide a valid suggestion; showing th
 const fallbackReason = 'First available slot matching your selected activity.';
 
 async function suggestSlot(database, userId, input, now = new Date(), geminiClient = createGeminiClient()) {
-  bookingService.ensureStudent(database, userId);
+  await bookingService.ensureStudent(database, userId);
   if (!input || typeof input !== 'object' || Array.isArray(input)
     || !supportedActivities.has(input.activityType)) {
     throw new bookingService.BookingError(422, 'Choose a supported activity: web_cloud or networking.');
   }
 
-  const availableSlots = bookingService.listAvailableSlots(database, userId, input.date, now)
+  const availableSlots = (await bookingService.listAvailableSlots(database, userId, input.date, now))
     .filter((slot) => slot.activityType === input.activityType);
   if (availableSlots.length === 0) {
     return { suggestion: null, message: 'No matching workstation is available for this activity and date.' };

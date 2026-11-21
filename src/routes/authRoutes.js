@@ -18,9 +18,9 @@ function sessionToken(request) {
 }
 
 function requireUser(database, { api = false } = {}) {
-  return (request, response, next) => {
+  return async (request, response, next) => {
     const token = sessionToken(request);
-    const user = token ? authService.getUserForSession(database, token) : null;
+    const user = token ? await authService.getUserForSession(database, token) : null;
     if (!user) {
       if (api) return response.status(401).json({ error: 'Sign in first.' });
       return response.redirect(302, '/login');
@@ -59,7 +59,7 @@ function createAuthRouter(database, {
       const user = await authService.authenticate(database, request.body.email, request.body.password);
       if (!user) return response.redirect(303, '/login?error=credentials');
 
-      const session = authService.createSession(database, user.id);
+      const session = await authService.createSession(database, user.id);
       response.setHeader('Set-Cookie', `${sessionCookieName}=${session.token}; ${cookieOptions(isProduction)}`);
       return response.redirect(303, user.role === 'staff' ? '/staff' : '/my-bookings');
     } catch (error) {
@@ -112,8 +112,8 @@ function createAuthRouter(database, {
         redirectUri,
       });
       const profile = await googleClient.getProfile({ accessToken: tokens.accessToken });
-      const user = authService.authenticateGoogle(database, profile);
-      const session = authService.createSession(database, user.id);
+      const user = await authService.authenticateGoogle(database, profile);
+      const session = await authService.createSession(database, user.id);
       response.append('Set-Cookie', `${sessionCookieName}=${session.token}; ${cookieOptions(isProduction)}`);
       return response.redirect(303, user.role === 'staff' ? '/staff' : '/my-bookings');
     } catch (error) {
@@ -124,9 +124,9 @@ function createAuthRouter(database, {
     }
   });
 
-  router.post('/logout', requireUser(database), (request, response, next) => {
+  router.post('/logout', requireUser(database), async (request, response, next) => {
     try {
-      authService.revokeSession(database, request.sessionToken);
+      await authService.revokeSession(database, request.sessionToken);
       response.setHeader('Set-Cookie', `${sessionCookieName}=; ${clearCookieOptions(isProduction)}`);
       return response.redirect(303, '/login');
     } catch (error) {

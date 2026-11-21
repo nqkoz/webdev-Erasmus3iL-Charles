@@ -1,149 +1,178 @@
-function countForUser(database, userId) {
-  return database.prepare('SELECT COUNT(*) AS count FROM bookings WHERE user_id = ?').get(userId).count;
+function normalizeTimes(row) {
+  for (const field of ['startsAt', 'endsAt']) {
+    if (row[field] instanceof Date) row[field] = row[field].toISOString();
+  }
+  return row;
 }
 
-function listForUser(database, userId) {
-  return database.prepare(`
+function normalizeRows(rows) {
+  return rows.map(normalizeTimes);
+}
+
+async function countForUser(database, userId) {
+  const result = await database.query(
+    'SELECT COUNT(*)::integer AS count FROM bookings WHERE user_id = $1',
+    [userId],
+  );
+  return result.rows[0].count;
+}
+
+async function listForUser(database, userId) {
+  const result = await database.query(`
     SELECT
       bookings.id,
-      bookings.starts_at AS startsAt,
-      bookings.ends_at AS endsAt,
+      bookings.starts_at AS "startsAt",
+      bookings.ends_at AS "endsAt",
       bookings.status,
-      labs.name AS labName,
-      labs.location AS labLocation,
-      workstations.name AS workstationName
+      labs.name AS "labName",
+      labs.location AS "labLocation",
+      workstations.name AS "workstationName"
     FROM bookings
     JOIN workstations ON workstations.id = bookings.workstation_id
     JOIN labs ON labs.id = workstations.lab_id
-    WHERE bookings.user_id = ?
+    WHERE bookings.user_id = $1
     ORDER BY bookings.starts_at, bookings.id
-  `).all(userId);
+  `, [userId]);
+  return normalizeRows(result.rows);
 }
 
-function listAllBookings(database) {
-  return database.prepare(`
+async function listAllBookings(database) {
+  const result = await database.query(`
     SELECT
       bookings.id,
-      bookings.user_id AS userId,
-      users.email AS studentEmail,
-      bookings.starts_at AS startsAt,
-      bookings.ends_at AS endsAt,
+      bookings.user_id AS "userId",
+      users.email AS "studentEmail",
+      bookings.starts_at AS "startsAt",
+      bookings.ends_at AS "endsAt",
       bookings.status,
-      labs.name AS labName,
-      labs.location AS labLocation,
-      workstations.name AS workstationName
+      labs.name AS "labName",
+      labs.location AS "labLocation",
+      workstations.name AS "workstationName"
     FROM bookings
     JOIN users ON users.id = bookings.user_id
     JOIN workstations ON workstations.id = bookings.workstation_id
     JOIN labs ON labs.id = workstations.lab_id
     ORDER BY bookings.starts_at, bookings.id
-  `).all();
+  `);
+  return normalizeRows(result.rows);
 }
 
-function listWorkstations(database) {
-  return database.prepare(`
+async function listWorkstations(database) {
+  const result = await database.query(`
     SELECT
-      workstations.id AS workstationId,
-      workstations.name AS workstationName,
-      workstations.description AS workstationDescription,
-      workstations.activity_type AS activityType,
-      labs.id AS labId,
-      labs.name AS labName,
-      labs.location AS labLocation
+      workstations.id AS "workstationId",
+      workstations.name AS "workstationName",
+      workstations.description AS "workstationDescription",
+      workstations.activity_type AS "activityType",
+      labs.id AS "labId",
+      labs.name AS "labName",
+      labs.location AS "labLocation"
     FROM workstations
     JOIN labs ON labs.id = workstations.lab_id
     ORDER BY labs.name, workstations.name
-  `).all();
+  `);
+  return result.rows;
 }
 
-function createLabAndWorkstation(database, {
+async function createLabAndWorkstation(database, {
   labName,
   labLocation,
   workstationName,
   workstationDescription,
   activityType,
 }) {
-  return database.transaction(() => {
-    const labResult = database.prepare(`
-      INSERT INTO labs (name, location) VALUES (?, ?)
-    `).run(labName, labLocation);
-    const workstationResult = database.prepare(`
+  return database.transaction(async (transaction) => {
+    const labResult = await transaction.query(`
+      INSERT INTO labs (name, location) VALUES ($1, $2) RETURNING id
+    `, [labName, labLocation]);
+    const workstationResult = await transaction.query(`
       INSERT INTO workstations (lab_id, name, description, activity_type)
-      VALUES (?, ?, ?, ?)
-    `).run(Number(labResult.lastInsertRowid), workstationName, workstationDescription, activityType);
+      VALUES ($1, $2, $3, $4) RETURNING id
+    `, [labResult.rows[0].id, workstationName, workstationDescription, activityType]);
     return {
-      labId: Number(labResult.lastInsertRowid),
-      workstationId: Number(workstationResult.lastInsertRowid),
+      labId: labResult.rows[0].id,
+      workstationId: workstationResult.rows[0].id,
     };
-  })();
+  });
 }
 
-function listConflictingForRange(database, startsAt, endsAt) {
-  return database.prepare(`
-    SELECT workstation_id AS workstationId, starts_at AS startsAt, ends_at AS endsAt
+async function listConflictingForRange(database, startsAt, endsAt) {
+  const result = await database.query(`
+    SELECT workstation_id AS "workstationId",
+      starts_at AS "startsAt", ends_at AS "endsAt"
     FROM bookings
-    WHERE status = 'active' AND starts_at < ? AND ends_at > ?
-  `).all(endsAt, startsAt);
+    WHERE status = 'active' AND starts_at < $1 AND ends_at > $2
+  `, [endsAt, startsAt]);
+  return normalizeRows(result.rows);
 }
 
-function findWorkstation(database, workstationId) {
-  return database.prepare(`
-    SELECT id, name FROM workstations WHERE id = ?
-  `).get(workstationId);
+async function findWorkstation(database, workstationId) {
+  const result = await database.query(
+    'SELECT id, name FROM workstations WHERE id = $1',
+    [workstationId],
+  );
+  return result.rows[0];
 }
 
-function countFutureActiveForUser(database, userId, now) {
-  return database.prepare(`
-    SELECT COUNT(*) AS count
+async function countFutureActiveForUser(database, userId, now) {
+  const result = await database.query(`
+    SELECT COUNT(*)::integer AS count
     FROM bookings
-    WHERE user_id = ? AND status = 'active' AND starts_at > ?
-  `).get(userId, now).count;
+    WHERE user_id = $1 AND status = 'active' AND starts_at > $2
+  `, [userId, now]);
+  return result.rows[0].count;
 }
 
-function createForUser(database, { userId, workstationId, startsAt, endsAt }) {
-  const result = database.prepare(`
+async function createForUser(database, { userId, workstationId, startsAt, endsAt }) {
+  const result = await database.query(`
     INSERT INTO bookings (user_id, workstation_id, starts_at, ends_at, status)
-    VALUES (?, ?, ?, ?, 'active')
-  `).run(userId, workstationId, startsAt, endsAt);
-  return Number(result.lastInsertRowid);
+    VALUES ($1, $2, $3, $4, 'active')
+    RETURNING id
+  `, [userId, workstationId, startsAt, endsAt]);
+  return result.rows[0].id;
 }
 
-function findBooking(database, bookingId) {
-  return database.prepare(`
-    SELECT id, user_id AS userId, starts_at AS startsAt, status
+async function findBooking(database, bookingId) {
+  const result = await database.query(`
+    SELECT id, user_id AS "userId", starts_at AS "startsAt", status
     FROM bookings
-    WHERE id = ?
-  `).get(bookingId);
+    WHERE id = $1
+  `, [bookingId]);
+  return result.rows[0] ? normalizeTimes(result.rows[0]) : undefined;
 }
 
-function cancel(database, bookingId) {
-  return database.prepare(`
+async function cancel(database, bookingId) {
+  const result = await database.query(`
     UPDATE bookings SET status = 'cancelled'
-    WHERE id = ? AND status = 'active'
-  `).run(bookingId).changes;
+    WHERE id = $1 AND status = 'active'
+  `, [bookingId]);
+  return result.rowCount;
 }
 
-function seedDemoBookings(database, { userId, bookings }) {
-  return database.transaction(() => {
-    const marker = database.prepare('SELECT 1 FROM seed_state WHERE name = ?').get('demo-student-bookings-v1');
-    if (marker) return false;
-    const existing = countForUser(database, userId);
+async function seedDemoBookings(database, { userId, bookings }) {
+  return database.transaction(async (transaction) => {
+    const marker = await transaction.query(
+      'SELECT 1 FROM seed_state WHERE name = $1',
+      ['demo-student-bookings-v1'],
+    );
+    if (marker.rowCount > 0) return false;
+
+    const existing = await countForUser(transaction, userId);
     if (existing > 0) {
-      database.prepare('INSERT INTO seed_state (name) VALUES (?)').run('demo-student-bookings-v1');
+      await transaction.query('INSERT INTO seed_state (name) VALUES ($1)', ['demo-student-bookings-v1']);
       return false;
     }
 
-    const insert = database.prepare(`
-      INSERT INTO bookings (user_id, workstation_id, starts_at, ends_at, status)
-      VALUES (?, ?, ?, ?, 'active')
-    `);
     for (const booking of bookings) {
-      insert.run(userId, booking.workstationId, booking.startsAt, booking.endsAt);
+      await transaction.query(`
+        INSERT INTO bookings (user_id, workstation_id, starts_at, ends_at, status)
+        VALUES ($1, $2, $3, $4, 'active')
+      `, [userId, booking.workstationId, booking.startsAt, booking.endsAt]);
     }
 
-    database.prepare('INSERT INTO seed_state (name) VALUES (?)').run('demo-student-bookings-v1');
+    await transaction.query('INSERT INTO seed_state (name) VALUES ($1)', ['demo-student-bookings-v1']);
     return true;
-  })();
+  });
 }
 
 module.exports = {

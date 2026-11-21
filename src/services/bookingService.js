@@ -12,32 +12,32 @@ class BookingError extends Error {
   }
 }
 
-function listMyBookings(database, userId) {
-  ensureStudent(database, userId);
+async function listMyBookings(database, userId) {
+  await ensureStudent(database, userId);
   return bookingRepository.listForUser(database, userId);
 }
 
-function listAllBookingsForStaff(database, userId) {
-  ensureStaff(database, userId);
+async function listAllBookingsForStaff(database, userId) {
+  await ensureStaff(database, userId);
   return bookingRepository.listAllBookings(database);
 }
 
-function listWorkstationsForStaff(database, userId) {
-  ensureStaff(database, userId);
+async function listWorkstationsForStaff(database, userId) {
+  await ensureStaff(database, userId);
   return bookingRepository.listWorkstations(database);
 }
 
-function ensureAvailabilityAccess(database, userId) {
+async function ensureAvailabilityAccess(database, userId) {
   if (!Number.isInteger(userId) || userId < 1) throw new BookingError(401, 'Sign in first.');
-  const user = userRepository.findById(database, userId);
+  const user = await userRepository.findById(database, userId);
   if (!user) throw new BookingError(401, 'Sign in first.');
   if (!['student', 'staff'].includes(user.role)) {
     throw new BookingError(403, 'Student or staff access is required.');
   }
 }
 
-function createLabAndWorkstation(database, userId, input) {
-  ensureStaff(database, userId);
+async function createLabAndWorkstation(database, userId, input) {
+  await ensureStaff(database, userId);
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new BookingError(400, 'Enter valid lab and workstation details.');
   }
@@ -51,7 +51,7 @@ function createLabAndWorkstation(database, userId, input) {
   }
 
   try {
-    return bookingRepository.createLabAndWorkstation(database, {
+    return await bookingRepository.createLabAndWorkstation(database, {
       labName,
       labLocation,
       workstationName,
@@ -59,7 +59,7 @@ function createLabAndWorkstation(database, userId, input) {
       activityType: input.activityType,
     });
   } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (error.code === '23505') {
       throw new BookingError(409, 'A lab or workstation with that name already exists.');
     }
     throw error;
@@ -73,7 +73,7 @@ function requiredText(value, label, maximumLength) {
   return value.trim();
 }
 
-function ensureDemoBookings(database, userId, now = new Date()) {
+async function ensureDemoBookings(database, userId, now = new Date()) {
   if (!Number.isInteger(userId) || userId < 1) throw new Error('A seeded student is required');
 
   const dates = nextWeekdays(now, 2);
@@ -88,8 +88,8 @@ function ensureDemoBookings(database, userId, now = new Date()) {
   return bookingRepository.seedDemoBookings(database, { userId, bookings });
 }
 
-function listAvailableSlots(database, userId, requestedDate, now = new Date()) {
-  ensureAvailabilityAccess(database, userId);
+async function listAvailableSlots(database, userId, requestedDate, now = new Date()) {
+  await ensureAvailabilityAccess(database, userId);
   const date = parseDate(requestedDate);
   const today = getLocalDateParts(now);
   const dayOffset = Math.round((date.getTime() - Date.UTC(today.year, today.month - 1, today.day)) / 86400000);
@@ -104,8 +104,8 @@ function listAvailableSlots(database, userId, requestedDate, now = new Date()) {
   const nextDate = new Date(date.getTime() + 86400000);
   const startsAt = zonedTimeToUtc(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), 0);
   const endsAt = zonedTimeToUtc(nextDate.getUTCFullYear(), nextDate.getUTCMonth() + 1, nextDate.getUTCDate(), 0);
-  const workstations = bookingRepository.listWorkstations(database);
-  const conflicts = bookingRepository.listConflictingForRange(database, startsAt, endsAt);
+  const workstations = await bookingRepository.listWorkstations(database);
+  const conflicts = await bookingRepository.listConflictingForRange(database, startsAt, endsAt);
   const nowIso = now.toISOString();
   const slots = [];
 
@@ -126,8 +126,8 @@ function listAvailableSlots(database, userId, requestedDate, now = new Date()) {
   return slots;
 }
 
-function createBooking(database, userId, bookingInput, now = new Date()) {
-  ensureStudent(database, userId);
+async function createBooking(database, userId, bookingInput, now = new Date()) {
+  await ensureStudent(database, userId);
   if (!bookingInput || typeof bookingInput !== 'object' || Array.isArray(bookingInput)) {
     throw new BookingError(400, 'Choose a valid workstation and time slot.');
   }
@@ -143,56 +143,56 @@ function createBooking(database, userId, bookingInput, now = new Date()) {
   const end = new Date(start.getTime() + slotLengthMs);
   if (start <= now) throw new BookingError(400, 'Choose a future time.');
   validateBookableDate(start, now);
-  const workstation = bookingRepository.findWorkstation(database, workstationId);
+  const workstation = await bookingRepository.findWorkstation(database, workstationId);
   if (!workstation) throw new BookingError(404, 'Workstation not found.');
 
   try {
-    return database.transaction(() => {
-      if (bookingRepository.countFutureActiveForUser(database, userId, now.toISOString()) >= 3) {
+    return await database.transaction(async (transaction) => {
+      if (await bookingRepository.countFutureActiveForUser(transaction, userId, now.toISOString()) >= 3) {
         throw new BookingError(409, 'You have reached the booking limit');
       }
-      const bookingId = bookingRepository.createForUser(database, {
+      const bookingId = await bookingRepository.createForUser(transaction, {
         userId,
         workstationId,
         startsAt: start.toISOString(),
         endsAt: end.toISOString(),
       });
       return { id: bookingId, workstationId, startsAt: start.toISOString(), endsAt: end.toISOString(), status: 'active' };
-    })();
+    });
   } catch (error) {
     if (error instanceof BookingError) throw error;
-    if (error.message.includes('overlaps an active booking')) {
+    if (error.code === '23P01' || error.message.includes('overlaps an active booking')) {
       throw new BookingError(409, 'This slot is no longer available');
     }
     throw error;
   }
 }
 
-function cancelBooking(database, userId, bookingId, now = new Date()) {
-  ensureStudent(database, userId);
+async function cancelBooking(database, userId, bookingId, now = new Date()) {
+  await ensureStudent(database, userId);
   if (!Number.isInteger(bookingId) || bookingId < 1) throw new BookingError(400, 'Choose a valid booking.');
 
-  return database.transaction(() => {
-    const booking = bookingRepository.findBooking(database, bookingId);
+  return database.transaction(async (transaction) => {
+    const booking = await bookingRepository.findBooking(transaction, bookingId);
     if (!booking) throw new BookingError(404, 'Booking not found.');
     if (booking.userId !== userId) throw new BookingError(403, 'You cannot cancel another student’s booking.');
     if (booking.status !== 'active') throw new BookingError(409, 'This booking is already cancelled.');
     if (booking.startsAt <= now.toISOString()) throw new BookingError(409, 'A booking cannot be cancelled after it starts.');
-    bookingRepository.cancel(database, bookingId);
+    await bookingRepository.cancel(transaction, bookingId);
     return { id: bookingId, status: 'cancelled' };
-  })();
+  });
 }
 
-function ensureStudent(database, userId) {
+async function ensureStudent(database, userId) {
   if (!Number.isInteger(userId) || userId < 1) throw new BookingError(401, 'Sign in first.');
-  const user = userRepository.findById(database, userId);
+  const user = await userRepository.findById(database, userId);
   if (!user) throw new BookingError(401, 'Sign in first.');
   if (user.role !== 'student') throw new BookingError(403, 'Student access is required.');
 }
 
-function ensureStaff(database, userId) {
+async function ensureStaff(database, userId) {
   if (!Number.isInteger(userId) || userId < 1) throw new BookingError(401, 'Sign in first.');
-  const user = userRepository.findById(database, userId);
+  const user = await userRepository.findById(database, userId);
   if (!user) throw new BookingError(401, 'Sign in first.');
   if (user.role !== 'staff') throw new BookingError(403, 'Staff access is required.');
 }
@@ -242,7 +242,6 @@ function nextWeekdays(now, count) {
     });
   }
 
-  if (dates.length !== count) throw new Error('Could not find upcoming weekdays for the demo bookings');
   return dates;
 }
 

@@ -1,19 +1,15 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const test = require('node:test');
-const { openDatabase } = require('../src/data/database');
+const { createTestDatabase } = require('../src/data/database');
 const userRepository = require('../src/data/userRepository');
 const authService = require('../src/services/authService');
 const { createApp } = require('../src/server');
 
 async function createFixture(t, { googleClient, localUser = true } = {}) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lab-booking-google-auth-'));
-  const database = openDatabase({ filename: path.join(directory, 'test.db') });
+  const database = await createTestDatabase();
   let localUserId = null;
   if (localUser) {
-    localUserId = userRepository.createUser(database, {
+    localUserId = await userRepository.createUser(database, {
       email: 'student@example.test',
       passwordHash: await authService.hashPassword('correct-horse-battery'),
       role: 'student',
@@ -23,8 +19,7 @@ async function createFixture(t, { googleClient, localUser = true } = {}) {
   await new Promise((resolve) => server.once('listening', resolve));
   t.after(async () => {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    database.close();
-    fs.rmSync(directory, { recursive: true, force: true });
+    await database.close();
   });
   return {
     database,
@@ -75,10 +70,10 @@ test('AC-13 verified Google sign-in links to the local user and creates the same
     email_verified: true,
   }, calls);
   const { baseUrl, database, localUserId } = await createFixture(t, { googleClient });
-  database.prepare(`
+  await database.query(`
     INSERT INTO bookings (user_id, workstation_id, starts_at, ends_at, status)
-    VALUES (?, ?, ?, ?, 'active')
-  `).run(localUserId, 1, '2026-11-02T08:00:00.000Z', '2026-11-02T09:00:00.000Z');
+    VALUES ($1, $2, $3, $4, 'active')
+  `, [localUserId, 1, '2026-11-02T08:00:00.000Z', '2026-11-02T09:00:00.000Z']);
 
   const { authorizationUrl, cookie } = await beginGoogleSignIn(baseUrl);
   assert.equal(authorizationUrl.searchParams.get('state'), calls.authorization.state);
@@ -103,13 +98,13 @@ test('AC-13 verified Google sign-in links to the local user and creates the same
   const googleBookings = await googleBookingsResponse.json();
   assert.equal(googleBookings.length, 1);
   assert.equal(googleBookings[0].workstationName, 'PC-01');
-  assert.equal(authService.getUserForSession(database, sessionCookie).id, localUserId);
-  assert.equal(database.prepare('SELECT user_id AS userId FROM oauth_accounts WHERE provider_subject = ?').get('google-subject-123').userId, localUserId);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM users').get().count, 1);
+  assert.equal((await authService.getUserForSession(database, sessionCookie)).id, localUserId);
+  assert.equal((await database.query('SELECT user_id AS "userId" FROM oauth_accounts WHERE provider_subject = $1', ['google-subject-123'])).rows[0].userId, localUserId);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM users')).rows[0].count, 1);
 
   const localUser = await authService.authenticate(database, 'student@example.test', 'correct-horse-battery');
   assert.equal(localUser.id, localUserId);
-  const localSession = authService.createSession(database, localUser.id);
+  const localSession = await authService.createSession(database, localUser.id);
   const localBookingsResponse = await fetch(`${baseUrl}/api/my-bookings`, {
     headers: { cookie: `lab_session=${localSession.token}` },
   });
@@ -132,9 +127,9 @@ test('AC-13 an unverified Google e-mail is not linked to an existing local accou
   assert.equal(callback.status, 303);
   assert.equal(callback.headers.get('location'), '/login?error=google');
   assert.equal(callback.headers.get('set-cookie').includes('lab_session='), false);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM oauth_accounts').get().count, 0);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM users').get().count, 1);
-  assert.equal(userRepository.findById(database, localUserId).email, 'student@example.test');
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM oauth_accounts')).rows[0].count, 0);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM users')).rows[0].count, 1);
+  assert.equal((await userRepository.findById(database, localUserId)).email, 'student@example.test');
 });
 
 test('Google callback rejects mismatched state without exchanging the authorization code', async (t) => {
@@ -154,7 +149,7 @@ test('Google callback rejects mismatched state without exchanging the authorizat
   assert.equal(callback.status, 303);
   assert.equal(callback.headers.get('location'), '/login?error=google');
   assert.equal(calls.exchange, undefined);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM sessions').get().count, 0);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM sessions')).rows[0].count, 0);
 });
 
 test('Google callback reports provider cancellation without creating a session', async (t) => {
@@ -174,7 +169,7 @@ test('Google callback reports provider cancellation without creating a session',
   assert.equal(callback.status, 303);
   assert.equal(callback.headers.get('location'), '/login?error=google');
   assert.equal(calls.exchange, undefined);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM sessions').get().count, 0);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM sessions')).rows[0].count, 0);
 });
 
 test('Google sign-in can create a passwordless student account and reuse its linked identity', async (t) => {
@@ -185,13 +180,13 @@ test('Google sign-in can create a passwordless student account and reuse its lin
   };
   const { database } = await createFixture(t, { localUser: false });
 
-  const firstUser = authService.authenticateGoogle(database, profile);
-  const secondUser = authService.authenticateGoogle(database, profile);
+  const firstUser = await authService.authenticateGoogle(database, profile);
+  const secondUser = await authService.authenticateGoogle(database, profile);
   assert.equal(firstUser.id, secondUser.id);
   assert.equal(firstUser.email, 'new.student@example.test');
   assert.equal(firstUser.role, 'student');
-  assert.equal(userRepository.findByEmail(database, firstUser.email).passwordHash, null);
-  assert.equal(database.prepare('SELECT COUNT(*) AS count FROM users').get().count, 1);
+  assert.equal((await userRepository.findByEmail(database, firstUser.email)).passwordHash, null);
+  assert.equal((await database.query('SELECT COUNT(*)::integer AS count FROM users')).rows[0].count, 1);
 });
 
 test('Google sign-in is unavailable without OAuth configuration', async (t) => {

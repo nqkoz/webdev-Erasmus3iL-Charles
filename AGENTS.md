@@ -7,7 +7,7 @@ Read this file at the start of every session. Keep it short and correct; update 
 This repository contains the Exercise 1 lecture/student MCP server and the Lab Booking project for university students and lab staff. See `SPEC.md` for the project's scope, acceptance criteria and planned architecture.
 ## Commands
 - Install: `npm install` (Windows PowerShell: `npm.cmd install`).
-- Run: `npm start` (serves http://localhost:3000; applies pending SQLite migrations at startup).
+- Run: `npm start` (Node.js 22; requires `DATABASE_URL`, applies PostgreSQL migrations, and serves http://localhost:3000).
 - Test: `npm test` (Windows PowerShell: `npm.cmd test`).
 - Coverage: `npm run coverage` (80% overall; 100% of service-layer branches).
 - MCP server: `npm run --silent mcp`
@@ -19,14 +19,15 @@ This repository contains the Exercise 1 lecture/student MCP server and the Lab B
 - stdout is reserved for JSON-RPC responses.
 - Debug logs and diagnostics go to stderr.
 - Tool failures use `isError: true`; protocol errors use JSON-RPC error codes.
-- Exercise 1 local data is stored in JSON files. Lab Booking data uses SQLite and numbered SQL migrations.
+- Exercise 1 local data is stored in JSON files. Lab Booking data uses PostgreSQL (`DATABASE_URL`) and numbered migrations in `migrations/postgres/`; tests use in-memory PGlite.
 - Project routes live in `src/routes/`, business rules in `src/services/`, and SQL access in `src/data/`; only the data layer writes SQL.
 - Front-end files live in `public/`; tests name the acceptance-criterion ID they prove.
 
 ## Current implementation status
 - Exercise 1 protocol code must remain student-authored under the course instructions: explain and review it, and have the student implement any required handler fixes.
 - The course's hand-entered terminal transcript still needs student evidence. The real-agent description comparison was performed in two student-reported VS Code UI trials with the server reload confirmed; never invent results or usage counts.
-- Lab Booking is in progress: the SQLite schema, local sign-in/session flow, protected bookings list, availability, booking, cancellation, staff dashboard, Google OAuth, Gemini slot suggestions, and five project MCP tools are implemented and covered by tests. The student confirmed the bookings and availability screens and the delete/reload behavior; unauthenticated page/API behavior was also checked against the running server. The student declined to create a persistent UI test booking. Google OAuth fake-client tests pass, and the student reports successfully signing in with a Google test account; the agent did not independently observe that browser session. The Gemini tests use fake clients; no real Gemini request has been made.
+- Lab Booking now uses PostgreSQL through `DATABASE_URL`; existing SQLite migrations are retained as history and the app applies only `migrations/postgres/`. The local sign-in/session flow, bookings, availability, booking/cancellation, staff dashboard, Google OAuth, Gemini suggestions, and five project MCP tools are implemented and covered. Tests use in-memory PGlite; fake Google/Gemini clients mean no provider requests are made by tests. The 54-test suite, Exercise 1 MCP conformance check, and 100% service / 80% overall coverage gates pass locally.
+- Exercise 4 application code includes `/health`, safe 404/error responses, and a Node 22 Dockerfile. Neon/Render accounts, real secrets, deployment, persistence/failure/rollback checks, UI evidence, `course.json` live URL, and the student's `READINESS.md` remain manual deliverables; do not claim they are completed before the student observes them.
 - The project layering and model/session/coverage rules below are requirements for Lab Booking, not claims about the Exercise 1 MCP server.
 
 ## Layers
@@ -57,7 +58,7 @@ that talks to the database directly is a second, unguarded way into your data: n
 
 ## Tests and coverage
 - Every acceptance criterion in `SPEC.md` has an id like `AC-3`, and a test whose title contains that id.
-- The coverage gate runs in CI: 100% of the service layer, 80% overall.
+- The coverage gate runs in CI: 100% service-layer lines, functions and branches; 80% overall lines.
 - A test is evidence. Changing a test so the code passes destroys the evidence.
 
 ## Always ask before
