@@ -7,6 +7,8 @@ const { openDatabase } = require('../src/data/database');
 const userRepository = require('../src/data/userRepository');
 const authService = require('../src/services/authService');
 const { createApp } = require('../src/server');
+const bookingService = require('../src/services/bookingService');
+const slotSuggestionService = require('../src/services/slotSuggestionService');
 
 const fixedNow = new Date('2026-10-30T12:00:00.000Z');
 const testDate = '2026-11-02';
@@ -75,6 +77,30 @@ function slotClient(suggestion, onCall = () => {}) {
     },
   };
 }
+test('AC-20 the suggestion service replaces a nonexistent model slot with a real available slot', async (t) => {
+  const { database, studentId } = await createFixture(t);
+
+  const availableSlots = bookingService
+    .listAvailableSlots(database, studentId, testDate, fixedNow)
+    .filter((slot) => slot.activityType === 'networking');
+
+  assert.ok(availableSlots.length > 0, 'the fixture must contain an available networking slot');
+
+  const result = await slotSuggestionService.suggestSlot(
+    database,
+    studentId,
+    { activityType: 'networking', date: testDate },
+    fixedNow,
+    slotClient({
+      slotId: '999:2026-11-02T06:00:00.000Z',
+      reason: 'This slot does not exist.',
+    }),
+  );
+
+  assert.deepEqual(result.suggestion.slot, availableSlots[0]);
+  assert.equal(result.suggestion.reason, 'First available slot matching your selected activity.');
+  assert.match(result.fallbackMessage, /Gemini/);
+});
 
 test('AC-10 and AC-18 a student receives one available model suggestion without creating a booking', async (t) => {
   let modelInput;

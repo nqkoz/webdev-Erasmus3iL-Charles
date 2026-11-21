@@ -104,3 +104,11 @@ One entry per agent session, newest at the bottom. Be honest: what went wrong is
 - Verification: targeted MCP and booking tests passed 12/12; `npm.cmd test` passed 47/47 app tests and Exercise 1 MCP 12/12; `npm.cmd run coverage` passed all 47 tests at 100% lines, branches and functions; `node checks/ex2.mjs` passed 32/32; `node checks/ex3.mjs` passed 18/18 when run with a temporary local Windows shim resolving `npm` to `npm.cmd` (the shim was removed afterward).
 - Safety: `.env` was not read or modified; no credentials were sent to a provider. No commit was created.
 - Remaining: the student should review and commit this step before any further work.
+
+## 2026-11-17 · Exercise 3 manual evidence and architecture note
+
+- Goal: review remaining Exercise 3 evidence before starting Exercise 4.
+- User-reported manual checks: the student confirmed checking the HTTP conflict response (409), unauthenticated response (401), and another user's cancellation response (403). The student also confirmed the availability screen's loading, empty and server-error states. These are student-reported results; the agent did not observe the checks.
+- Architecture note: the student drafted the explanation in their own words, asked for it to be added to `SPEC.md`, and confirmed the resulting note. The agent added full relative file paths, date/overlap details, the MCP path and a front-end layering trade-off.
+- Verification: the student reported that `node --test --test-name-pattern="AC-20 the suggestion service replaces" test/slotSuggestion.test.js` failed as expected while the invalid-model-slot fallback rule was commented out. The agent restored the rule, then `node --test test/slotSuggestion.test.js` passed 10/10 and `npm.cmd test` passed 48/48 application tests plus the Exercise 1 MCP check 12/12. `git diff --check` passed.
+- Remaining: the student should finish reviewing the feature diff and the Exercise 3 “What the agent did that I did not ask for” section, then commit and push the pending changes and check CI.

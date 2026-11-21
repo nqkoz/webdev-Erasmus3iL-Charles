@@ -47,10 +47,26 @@ Lab booking.
 Node.js 22 and Express provide JSON REST endpoints; plain HTML, CSS and JavaScript call them. Screens: sign-in, my bookings, workstation availability and booking, and the lab-staff dashboard. Every screen handles loading, empty, readable error and success states; the main flow is keyboard accessible, responsive at 380/768/1280 px, uses visible focus and design tokens, and meets 4.5:1 text contrast.
 
 ## Architecture
-- An HTTP request to view free slots is `GET /api/availability` → `bookingRoutes.js` → `bookingService.listAvailableSlots` (checks that the signed-in user is a student or staff member and applies date/availability rules) → `bookingRepository` → SQLite. The page uses this same API.
-- An MCP request to book a slot is JSON-RPC `tools/call` / `book_slot` → `mcp-server/labBookingServer.js` resolves the configured, unexpired `MCP_TOKEN` session → `bookingService.createBooking` (checks student role, booking limits and slot validity) → `bookingRepository` → the same SQLite database. MCP tools contain no SQL and do not bypass the HTTP service rules.
-- The other MCP tools call `listAvailableSlots`, `listMyBookings`, `cancelBooking` and `slotSuggestionService.suggestSlot`; the five tool names and access rules are listed above. The Exercise 1 `mcp-server/server.js` remains separate and continues serving its course JSON files.
-- Google sign-in uses `src/services/googleOAuthClient.js` and links verified provider identities through `src/data/oauthAccountRepository.js`; OAuth tests use fake clients and do not call Google. Suggestions use `src/services/geminiClient.js`; tests inject fake clients and do not call Gemini.
+
+### 1. Page rendering
+When a signed-in user opens `/availability`, the route in `src/routes/bookingRoutes.js` checks the session and returns the HTML created by `src/views/availabilityPage.js`. The page contains the date form, status message and available-slot list, and loads `public/availability.js`.
+
+### 2. Browser request and display
+When the user submits a date, `loadAvailability(date)` in `public/availability.js` clears the previous results, displays a loading message and sends `GET /api/availability?date=...` with the same-origin session. It displays each returned slot, a message when there are no slots, or an error when the request fails. The page state is represented in the DOM, including the status text and the list's `aria-busy` attribute.
+
+### 3. API and service
+The `GET /api/availability` route in `src/routes/bookingRoutes.js` checks the session and calls `bookingService.listAvailableSlots` in `src/services/bookingService.js`. The route returns the result as JSON. If the service raises a `BookingError`, the route sends its status code and message in the HTTP response.
+
+### 4. Business rules and database
+`listAvailableSlots` checks that the user is a student or staff member, validates that the date is today through 30 days ahead and a weekday, and considers one-hour slots from 08:00 to 18:00 in Europe/Sofia. It excludes slots that have already started and slots overlapping an active booking. It asks `src/data/bookingRepository.js` for workstations and conflicting bookings. The repository's SQL joins workstations to labs and reads active bookings overlapping the selected day. The service uses those results to produce the available slots.
+
+### 5. MCP integration
+For `list_free_slots`, `mcp-server/labBookingServer.js` resolves the user from the configured MCP session token, then calls the same `bookingService.listAvailableSlots` function as the HTTP route. The MCP server has no SQL query of its own; it uses the service and repository layers against the same SQLite database.
+
+### 6. Front-end layering trade-off
+`public/availability.js` handles the API request, renders the results and updates the page's status state in one file. This is less separated than having distinct browser API, view and state modules. It is kept together because this is a small page using plain JavaScript, and adding separate modules for it would add indirection without much benefit; the business rules and SQL remain in their service and repository layers.
+
+The other MCP tools call `listMyBookings`, `createBooking`, `cancelBooking` and `slotSuggestionService.suggestSlot` through the same application services. The Exercise 1 `mcp-server/server.js` remains separate and continues serving its course JSON files. Google sign-in uses `src/services/googleOAuthClient.js` and links verified provider identities through `src/data/oauthAccountRepository.js`; OAuth tests use fake clients and do not call Google. Suggestions use `src/services/geminiClient.js`; tests inject fake clients and do not call Gemini.
 
 ## Acceptance criteria
 - [AC-1] A student who signs in with a local e-mail and password sees their account's bookings; the database stores only a salted password hash.
